@@ -108,8 +108,8 @@ SET NOCOUNT ON;
             --req.SQ_REQUERIMENTO               AS CodigoRequerimento,
             fun.NUM_MATRICULA                 AS Matricula,
             ent.NOME_ENTID                    AS NomeParticipante,
-            CONVERT(VARCHAR(10),req.DT_REQUERIMENTO,103) AS DataRequerimento,
-            CONVERT(VARCHAR(10),req.DT_DEFERIMENTO,103)  AS DataDeferimento,
+            FORMAT(req.DT_REQUERIMENTO, 'dd/MM/yyyy HH:mm') AS DataRequerimento,
+            FORMAT(req.DT_DEFERIMENTO, 'dd/MM/yyyy') AS DataDeferimento,
             esp.Especie                       AS Especie,
             tip.Descricao                     AS Tipo,
             sit.DS_SIT_INSCRICAO              AS [Status],
@@ -136,14 +136,14 @@ SET NOCOUNT ON;
             THEN 'SIM' 
             ELSE '' END  AS DecisaoJudicial,
             pln.DS_PLANO                      AS Plano,
-            CONVERT(VARCHAR(10),dad.DT_OBITO,103) AS DataObito,
+            format (dad.DT_OBITO, 'dd/MM/yyyy')         AS DataObito,
+            format (req.DT_INI_BENEFICIO, 'dd/MM/yyyy') AS DataInicioBeneficio,
+            format (req.DT_INCLUSAO, 'dd/MM/yyyy')     AS DataInclusao,
         --    tip.Id                            AS CodigoTipoRequerimento,
         --    sit.NS_SIT_INSCRICAO              AS NumeroSituacao,
         --    pln.CD_PLANO                      AS CodigoPlano,
         --    req.CD_ESPECIE                    AS CodigoEspecie,
         --    his.MatriculaAtendimento          AS MatriculaResponsavel,
-        --    req.DT_INI_BENEFICIO              AS DataInicioBeneficio,
-        --    req.DT_INCLUSAO                   AS DataInclusao,
         --    req.NU_BENEFICIO_INSS             AS NumeroBeneficioINSS,
         --    req.VL_SALARIO_CONTRIB            AS ValorSalarioContribuicao,
         --    req.TP_BAD_SITUACAO_INSS          AS TipoSituacaoINSS,
@@ -209,12 +209,13 @@ SET NOCOUNT ON;
                 FROM web.HistoricoRequerimento AS sub
                 WHERE sub.SequencialRequerimento = req.SQ_REQUERIMENTO
             )
-            AND req.DT_REQUERIMENTO >= '09-01-2025' 
-            AND req.DT_REQUERIMENTO <= '10-01-2025' 
+            AND req.DT_REQUERIMENTO >= '09-01-2025' --mm-dd-aaaa
+            AND req.DT_REQUERIMENTO <= '11-01-2025' 
             AND req.CD_ESPECIE = '1' --BAD
-            AND sit.NS_SIT_INSCRICAO = '6' --PENDENCIA
+            -- AND sit.NS_SIT_INSCRICAO = '6' --PENDENCIA
             AND tip.Id = '1'-- CONCESSAO
             AND pln.CD_PLANO = '0002' --postalprev 
+            --and fun.NUM_MATRICULA ='089592050'
 
         ORDER BY
             req.DT_REQUERIMENTO ASC,
