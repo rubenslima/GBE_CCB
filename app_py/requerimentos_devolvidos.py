@@ -6,13 +6,40 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from dotenv import load_dotenv
+from datetime import datetime
 
+def ler_data(mensagem: str) -> str:
+    """
+    Lê uma data via input e converte para o formato mm-dd-aaaa,
+    aceitando dd/mm/aaaa ou mm-dd-aaaa.
+    """
+    while True:
+        entrada = input(mensagem).strip()
+
+        # Possíveis formatos aceitos
+        formatos = ["%d/%m/%Y", "%m-%d-%Y"]
+
+        for fmt in formatos:
+            try:
+                dt = datetime.strptime(entrada, fmt)
+                # Converte sempre para mm-dd-aaaa
+                return dt.strftime("%m-%d-%Y")
+            except ValueError:
+                pass
+
+        print("Formato inválido. Use dd/mm/aaaa ou mm-dd-aaaa.")
+
+# data_inicio ='10-01-2025' #mm-dd-aaaa
+# data_fim ='11-13-2025' #mm-dd-aaaa
+
+data_inicio = ler_data("Informe a data inicial (dd/mm/aaaa ou mm-dd-aaaa): ")
+data_fim = ler_data("Informe a data final (dd/mm/aaaa ou mm-dd-aaaa): ")
 
 # ------------------------------
 # Utilidades
 # ------------------------------
 def limpar_console() -> None:
-    os.system("cls" if os.name == "nt" else "clear")
+    os.system("cls" if os.name == "nt" else "clear")  
 
 
 def carregar_cfg():
@@ -101,8 +128,48 @@ def main():
         print(f"Erro nas variáveis de ambiente: {e}")
         return
 
-    query = """
-SET NOCOUNT ON;
+    # --------------------------
+    # Consulta com tabela temporaria
+    # --------------------------
+    query = f"""
+        set nocount on;
+
+        IF OBJECT_ID('tempdb..#Identificador') IS NOT NULL
+            DROP TABLE #Identificador;
+
+        SELECT rtrim(fun.NUM_MATRICULA)+'@'+rtrim(req.NU_BENEFICIO_INSS) identificador
+        into #Identificador
+        FROM dbo.WEB_GBE_REQUERIMENTO AS req
+        INNER JOIN dbo.CS_FUNCIONARIO AS fun
+            ON req.CD_FUNDACAO  = fun.CD_FUNDACAO
+            AND req.CD_INSCRICAO = fun.NUM_INSCRICAO
+        INNER JOIN dbo.CS_PLANOS_VINC AS plv
+            ON fun.CD_FUNDACAO   = plv.CD_FUNDACAO
+            AND fun.NUM_INSCRICAO = plv.NUM_INSCRICAO
+        INNER JOIN web.HistoricoRequerimento AS his
+            ON req.SQ_REQUERIMENTO = his.SequencialRequerimento
+        INNER JOIN dbo.TB_PLANOS AS pln
+            ON req.CD_PLANO    = pln.CD_PLANO
+            AND req.CD_FUNDACAO = pln.CD_FUNDACAO
+        INNER JOIN dbo.WEB_GPA_SIT_INSCRICOES AS sit
+            ON req.NS_SIT_REQUERIMENTO = sit.NS_SIT_INSCRICAO
+        INNER JOIN web.TipoRequerimentoBeneficio AS tip
+            ON req.TP_PROCESSO = tip.Id
+        WHERE 1=1
+            AND req.CD_PLANO = plv.CD_PLANO
+            AND his.Data = (        SELECT MAX(sub.Data)
+            FROM web.HistoricoRequerimento AS sub
+            WHERE sub.SequencialRequerimento = req.SQ_REQUERIMENTO     )
+            AND req.DT_REQUERIMENTO >= '{data_inicio}' 
+            AND req.DT_REQUERIMENTO <= '{data_fim}'
+            AND sit.NS_SIT_INSCRICAO in(99,6)
+            AND tip.Id = '1'
+            and len(req.NU_BENEFICIO_INSS)>1
+        group by fun.NUM_MATRICULA, req.NU_BENEFICIO_INSS 
+        order by fun.NUM_MATRICULA, req.NU_BENEFICIO_INSS 
+            
+
+
 
         SELECT 
             --req.SQ_REQUERIMENTO               AS CodigoRequerimento,
@@ -110,6 +177,7 @@ SET NOCOUNT ON;
             ent.NOME_ENTID                    AS NomeParticipante,
             FORMAT(req.DT_REQUERIMENTO, 'dd/MM/yyyy HH:mm') AS DataRequerimento,
             FORMAT(req.DT_DEFERIMENTO, 'dd/MM/yyyy') AS DataDeferimento,
+            req.NU_BENEFICIO_INSS             AS NumeroBeneficioINSS,
             esp.Especie                       AS Especie,
             tip.Descricao                     AS Tipo,
             sit.DS_SIT_INSCRICAO              AS [Status],
@@ -144,7 +212,6 @@ SET NOCOUNT ON;
         --    pln.CD_PLANO                      AS CodigoPlano,
         --    req.CD_ESPECIE                    AS CodigoEspecie,
         --    his.MatriculaAtendimento          AS MatriculaResponsavel,
-        --    req.NU_BENEFICIO_INSS             AS NumeroBeneficioINSS,
         --    req.VL_SALARIO_CONTRIB            AS ValorSalarioContribuicao,
         --    req.TP_BAD_SITUACAO_INSS          AS TipoSituacaoINSS,
         --    fun.CD_EMPRESA                    AS CodigoEmpresa,
@@ -209,18 +276,14 @@ SET NOCOUNT ON;
                 FROM web.HistoricoRequerimento AS sub
                 WHERE sub.SequencialRequerimento = req.SQ_REQUERIMENTO
             )
-            AND req.DT_REQUERIMENTO >= '09-01-2025' --mm-dd-aaaa
-            AND req.DT_REQUERIMENTO <= '11-01-2025' 
-            AND req.CD_ESPECIE = '1' --BAD
-            -- AND sit.NS_SIT_INSCRICAO = '6' --PENDENCIA
             AND tip.Id = '1'-- CONCESSAO
-            AND pln.CD_PLANO = '0002' --postalprev 
-            --and fun.NUM_MATRICULA ='089592050'
+            AND rtrim(fun.NUM_MATRICULA)+'@'+rtrim(req.NU_BENEFICIO_INSS) in(select identificador from #Identificador)
 
-        ORDER BY
-            req.DT_REQUERIMENTO ASC,
-            ent.NOME_ENTID      ASC;
-            
+        ORDER BY  ent.NOME_ENTID 
+        , req.NU_BENEFICIO_INSS 
+        ,  req.DT_REQUERIMENTO 
+
+	
 """.strip()
 
     print("Conectando ao DATABASE...")
@@ -252,7 +315,7 @@ SET NOCOUNT ON;
 
     # Montar nome de arquivo com timestamp para evitar sobrescrita
     ts = time.strftime("%Y%m%d")
-    nome_arquivo = os.path.join(out_dir, f"RequerimentosDevolvidos_{ts}.xlsx")
+    nome_arquivo = os.path.join(out_dir, f"Requerimentos_devolvidos_{ts}.xlsx")
 
     print("Gerando Excel...")
     try:
