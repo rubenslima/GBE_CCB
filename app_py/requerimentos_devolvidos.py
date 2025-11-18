@@ -474,7 +474,6 @@ def main():
 
     df_sem_numero_beneficio = sanitize_columns(df_sem_numero_beneficio) if not df_sem_numero_beneficio.empty else df_sem_numero_beneficio
 
-        # <<< NOVO: gerar DataFrame de estatística por Status >>>
     df_estat = pd.DataFrame()
     if not df.empty and "Status" in df.columns:
         df_estat = (
@@ -485,7 +484,7 @@ def main():
         df_estat.columns = ["Status", "Total"]
     else:
         print("Não foi possível gerar a aba 'Estatistica' (coluna 'Status' ausente ou sem dados).")
-    # <<< FIM NOVO >>>
+
 
     ts = time.strftime("%Y%m%d")
     nome_arquivo = os.path.join(out_dir, f"Requerimentos_devolvidos_{ts}.xlsx")
@@ -503,12 +502,11 @@ def main():
                 autosize_columns(writer, sheet_teste, df_sem_numero_beneficio)
             else:
                 print("Não há registros sem numero de beneficio (segunda consulta não retornou linhas).")
-                        # <<< NOVO: Aba 'Estatistica' >>>
+
             if df_estat is not None and not df_estat.empty:
                 sheet_est = "Estatistica"
                 df_estat.to_excel(writer, sheet_name=sheet_est, index=False)
                 autosize_columns(writer, sheet_est, df_estat)
-            # <<< FIM NOVO >>>    
 
         print(f"Arquivo salvo com sucesso: {nome_arquivo}")
         if df.empty:
