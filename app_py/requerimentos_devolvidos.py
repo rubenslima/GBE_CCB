@@ -16,8 +16,6 @@ def ler_data(mensagem: str) -> str:
     """
     while True:
         entrada = input(mensagem).strip()
-
-        # Possíveis formatos aceitos
         formatos = ["%d/%m/%Y", "%m-%d-%Y"]
 
         for fmt in formatos:
@@ -205,12 +203,12 @@ def main():
         pln.DS_PLANO                      AS Plano,
         format (dad.DT_OBITO, 'dd/MM/yyyy')         AS DataObito,
         format (req.DT_INI_BENEFICIO, 'dd/MM/yyyy') AS DataInicioBeneficio,
-        format (req.DT_INCLUSAO, 'dd/MM/yyyy')     AS DataInclusao,
+    --    format (req.DT_INCLUSAO, 'dd/MM/yyyy')     AS DataInclusao,
     --    tip.Id                            AS CodigoTipoRequerimento,
     --    sit.NS_SIT_INSCRICAO              AS NumeroSituacao,
     --    pln.CD_PLANO                      AS CodigoPlano,
     --    req.CD_ESPECIE                    AS CodigoEspecie,
-    --    his.MatriculaAtendimento          AS MatriculaResponsavel,
+        his.MatriculaAtendimento          AS MatriculaResponsavel,
     --    req.VL_SALARIO_CONTRIB            AS ValorSalarioContribuicao,
     --    req.TP_BAD_SITUACAO_INSS          AS TipoSituacaoINSS,
     --    fun.CD_EMPRESA                    AS CodigoEmpresa,
@@ -457,7 +455,6 @@ def main():
             # Consulta principal
             df = pd.read_sql(text(query_principal), conn)
 
-            # <<< NOVO: segunda consulta para a aba testada >>>
             try:
                 df_sem_numero_beneficio = pd.read_sql(text(query_sem_numero_beneficio), conn)
             except Exception as e:
@@ -469,37 +466,49 @@ def main():
         print(f"Erro ao executar as queries: {e}")
         return
 
-    # Garantir pasta de saída
     out_dir = "Arquivos"
     garantir_pasta(out_dir)
 
     # Tratar colunas
     df = sanitize_columns(df)
 
-    # <<< NOVO: tratar colunas da segunda aba (se houver) >>>
     df_sem_numero_beneficio = sanitize_columns(df_sem_numero_beneficio) if not df_sem_numero_beneficio.empty else df_sem_numero_beneficio
+
+        # <<< NOVO: gerar DataFrame de estatística por Status >>>
+    df_estat = pd.DataFrame()
+    if not df.empty and "Status" in df.columns:
+        df_estat = (
+            df["Status"]
+            .value_counts()
+            .reset_index()
+        )
+        df_estat.columns = ["Status", "Total"]
+    else:
+        print("Não foi possível gerar a aba 'Estatistica' (coluna 'Status' ausente ou sem dados).")
     # <<< FIM NOVO >>>
 
-    # Montar nome de arquivo com timestamp para evitar sobrescrita
     ts = time.strftime("%Y%m%d")
     nome_arquivo = os.path.join(out_dir, f"Requerimentos_devolvidos_{ts}.xlsx")
 
     print("Gerando Excel...")
     try:
         with pd.ExcelWriter(nome_arquivo, engine="xlsxwriter") as writer:
-            # Aba principal
             sheet = "Dados"
             df.to_excel(writer, sheet_name=sheet, index=False)
             autosize_columns(writer, sheet, df)
 
-            # <<< NOVO: criar aba 'Aba_testada' apenas se houver dados >>>
             if df_sem_numero_beneficio is not None and not df_sem_numero_beneficio.empty:
                 sheet_teste = "sem_numero_beneficio"
                 df_sem_numero_beneficio.to_excel(writer, sheet_name=sheet_teste, index=False)
                 autosize_columns(writer, sheet_teste, df_sem_numero_beneficio)
             else:
                 print("Não há registros sem numero de beneficio (segunda consulta não retornou linhas).")
-            # <<< FIM NOVO >>>
+                        # <<< NOVO: Aba 'Estatistica' >>>
+            if df_estat is not None and not df_estat.empty:
+                sheet_est = "Estatistica"
+                df_estat.to_excel(writer, sheet_name=sheet_est, index=False)
+                autosize_columns(writer, sheet_est, df_estat)
+            # <<< FIM NOVO >>>    
 
         print(f"Arquivo salvo com sucesso: {nome_arquivo}")
         if df.empty:
