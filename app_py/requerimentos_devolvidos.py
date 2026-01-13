@@ -1,3 +1,9 @@
+"""
+Vê todos
+
+"""
+
+
 import os
 import re
 import time
@@ -30,7 +36,6 @@ def ler_data(mensagem: str) -> str:
 
 data_inicio = ler_data("Informe a data inicial (dd/mm/aaaa ou mm-dd-aaaa): ")
 data_fim = ler_data("Informe a data final (dd/mm/aaaa ou mm-dd-aaaa): ")
-
 
 # ------------------------------
 # Utilidades
@@ -278,7 +283,7 @@ def main():
 
     ORDER BY  ent.NOME_ENTID 
     , req.NU_BENEFICIO_INSS 
-    ,  req.DT_REQUERIMENTO 
+    , isnull(req.DT_DEFERIMENTO, req.DT_REQUERIMENTO ) desc
 
 	
     """.strip()

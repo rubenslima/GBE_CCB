@@ -134,6 +134,9 @@ def main():
     IF OBJECT_ID('tempdb..#Identificador') IS NOT NULL
         DROP TABLE #Identificador;
 
+    IF OBJECT_ID('tempdb..#passo01') IS NOT NULL
+        DROP TABLE #passo01;    
+
     SELECT rtrim(fun.NUM_MATRICULA)+'@'+rtrim(req.NU_BENEFICIO_INSS) identificador
     into #Identificador
     FROM dbo.WEB_GBE_REQUERIMENTO AS req

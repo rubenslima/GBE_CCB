@@ -1,3 +1,9 @@
+"""
+retira os indeferidos
+
+"""
+
+
 import os
 import re
 import time
@@ -301,6 +307,9 @@ select * from #passo01
 
     IF OBJECT_ID('tempdb..#Identificador_matricula') IS NOT NULL
         DROP TABLE #Identificador_matricula;
+
+    IF OBJECT_ID('tempdb..#passo01') IS NOT NULL
+        DROP TABLE #passo01;    
 
     SELECT rtrim(fun.NUM_MATRICULA) matricula
     into #Identificador_matricula
