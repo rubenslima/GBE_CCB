@@ -162,7 +162,7 @@ def main():
         WHERE sub.SequencialRequerimento = req.SQ_REQUERIMENTO     )
             AND req.DT_REQUERIMENTO >= '{data_inicio}' 
             AND req.DT_REQUERIMENTO <= '{data_fim}'
-        AND sit.NS_SIT_INSCRICAO =6
+        AND sit.NS_SIT_INSCRICAO in(99,6) --(6)PENDENCIA (99)INDEFERIDO
         AND tip.Id = '1'
         and len(req.NU_BENEFICIO_INSS)>1
     group by fun.NUM_MATRICULA, req.NU_BENEFICIO_INSS 
