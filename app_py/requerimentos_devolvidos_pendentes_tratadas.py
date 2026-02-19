@@ -13,29 +13,60 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from dotenv import load_dotenv
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
 
+# def ler_data(mensagem: str) -> str:
+#     """
+#     Lê uma data via input e converte para o formato mm-dd-aaaa,
+#     aceitando dd/mm/aaaa ou mm-dd-aaaa.
+#     """
+#     while True:
+#         entrada = input(mensagem).strip()
+#         formatos = ["%d/%m/%Y", "%m-%d-%Y"]
 
-def ler_data(mensagem: str) -> str:
-    """
-    Lê uma data via input e converte para o formato mm-dd-aaaa,
-    aceitando dd/mm/aaaa ou mm-dd-aaaa.
-    """
+#         for fmt in formatos:
+#             try:
+#                 dt = datetime.strptime(entrada, fmt)
+#                 # Converte sempre para mm-dd-aaaa
+#                 return dt.strftime("%m-%d-%Y")
+#             except ValueError:
+#                 pass
+
+#         print("Formato inválido. Use dd/mm/aaaa ou mm-dd-aaaa.")
+
+# data_inicio = ler_data("Informe a data inicial (dd/mm/aaaa ou mm-dd-aaaa): ")
+# data_fim = ler_data("Informe a data final (dd/mm/aaaa ou mm-dd-aaaa): ")
+
+def ler_data(mensagem: str, permitir_vazio: bool = False) -> str | None:
+
     while True:
         entrada = input(mensagem).strip()
+
+        if permitir_vazio and entrada == "":
+            return None
+
         formatos = ["%d/%m/%Y", "%m-%d-%Y"]
 
         for fmt in formatos:
             try:
                 dt = datetime.strptime(entrada, fmt)
-                # Converte sempre para mm-dd-aaaa
                 return dt.strftime("%m-%d-%Y")
             except ValueError:
                 pass
 
         print("Formato inválido. Use dd/mm/aaaa ou mm-dd-aaaa.")
 
-data_inicio = ler_data("Informe a data inicial (dd/mm/aaaa ou mm-dd-aaaa): ")
 data_fim = ler_data("Informe a data final (dd/mm/aaaa ou mm-dd-aaaa): ")
+
+data_inicio = ler_data(
+    "Informe a data inicial (dd/mm/aaaa ou mm-dd-aaaa) ou pressione Enter para usar 12 meses anteriores: ",
+    permitir_vazio=True
+)
+
+if data_inicio is None:
+    dt_fim = datetime.strptime(data_fim, "%m-%d-%Y")
+    dt_inicio = dt_fim - relativedelta(months=12)
+    data_inicio = dt_inicio.strftime("%m-%d-%Y")
 
 
 # ------------------------------
@@ -43,6 +74,7 @@ data_fim = ler_data("Informe a data final (dd/mm/aaaa ou mm-dd-aaaa): ")
 # ------------------------------
 def limpar_console() -> None:
     os.system("cls" if os.name == "nt" else "clear")
+
 
 
 def carregar_cfg():
