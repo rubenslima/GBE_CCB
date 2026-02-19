@@ -15,28 +15,6 @@ from dotenv import load_dotenv
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
-# def ler_data(mensagem: str) -> str:
-#     """
-#     Lê uma data via input e converte para o formato mm-dd-aaaa,
-#     aceitando dd/mm/aaaa ou mm-dd-aaaa.
-#     """
-#     while True:
-#         entrada = input(mensagem).strip()
-#         formatos = ["%d/%m/%Y", "%m-%d-%Y"]
-
-#         for fmt in formatos:
-#             try:
-#                 dt = datetime.strptime(entrada, fmt)
-#                 # Converte sempre para mm-dd-aaaa
-#                 return dt.strftime("%m-%d-%Y")
-#             except ValueError:
-#                 pass
-
-#         print("Formato inválido. Use dd/mm/aaaa ou mm-dd-aaaa.")
-
-# data_inicio = ler_data("Informe a data inicial (dd/mm/aaaa ou mm-dd-aaaa): ")
-# data_fim = ler_data("Informe a data final (dd/mm/aaaa ou mm-dd-aaaa): ")
-
 def ler_data(mensagem: str, permitir_vazio: bool = False) -> str | None:
 
     while True:
@@ -54,12 +32,12 @@ def ler_data(mensagem: str, permitir_vazio: bool = False) -> str | None:
             except ValueError:
                 pass
 
-        print("Formato inválido. Use dd/mm/aaaa ou mm-dd-aaaa.")
+        print("Formato inválido. Use dd/mm/aaaa.")
 
-data_fim = ler_data("Informe a data final (dd/mm/aaaa ou mm-dd-aaaa): ")
+data_fim = ler_data("Informe a data final (dd/mm/aaaa): ")
 
 data_inicio = ler_data(
-    "Informe a data inicial (dd/mm/aaaa ou mm-dd-aaaa) ou pressione Enter para usar 12 meses anteriores: ",
+    "Informe a data inicial (dd/mm/aaaa) - pressione Enter para usar 12 meses anteriores: ",
     permitir_vazio=True
 )
 
