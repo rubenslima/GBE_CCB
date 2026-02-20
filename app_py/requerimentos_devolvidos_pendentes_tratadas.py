@@ -185,7 +185,7 @@ def main():
 
 
     SELECT 
-        --req.SQ_REQUERIMENTO               AS CodigoRequerimento,
+        req.SQ_REQUERIMENTO               AS CodigoRequerimento,
         fun.NUM_MATRICULA                 AS Matricula,
         ent.NOME_ENTID                    AS NomeParticipante,
         FORMAT(req.DT_REQUERIMENTO, 'dd/MM/yyyy HH:mm') AS DataRequerimento,
@@ -302,12 +302,30 @@ where rtrim(MATRICULA)+'@'+rtrim(NumeroBeneficioINSS) in
      from #passo01
     where [status] ='INDEFERIDO')
 
-select * from #passo01
-    ORDER BY  NomeParticipante
-    , NumeroBeneficioINSS 
-    , DataRequerimento
-
-
+;WITH pend AS (
+    SELECT
+        t.*,
+        rn_pend = ROW_NUMBER() OVER (
+            PARTITION BY t.matricula, t.NumeroBeneficioINSS
+            ORDER BY t.CodigoRequerimento DESC --gerar ordem ultimo pendente
+        )
+    FROM #passo01 t
+    WHERE t.[status] = 'PENDENCIA'
+),
+defr AS (
+    SELECT *,1 as rn_pend
+    FROM #passo01
+    WHERE [status] <> 'PENDENCIA'
+)
+SELECT Matricula,NomeParticipante,DataRequerimento,DataDeferimento,NumeroBeneficioINSS,Especie,Tipo,[Status]
+,Responsavel,AutoAtendimento,DecisaoJudicial,Plano,DataObito,DataInicioBeneficio,MatriculaResponsavel,AnexouLaudo,IsencaoIR
+FROM defr
+UNION ALL
+SELECT Matricula,NomeParticipante,DataRequerimento,DataDeferimento,NumeroBeneficioINSS,Especie,Tipo,[Status]
+,Responsavel,AutoAtendimento,DecisaoJudicial,Plano,DataObito,DataInicioBeneficio,MatriculaResponsavel,AnexouLaudo,IsencaoIR
+FROM pend
+WHERE rn_pend = 1 -- pegar o ultimo pendente
+ORDER BY matricula, NumeroBeneficioINSS, DataRequerimento desc;
 	
     """.strip()
 
