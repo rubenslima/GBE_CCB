@@ -302,6 +302,31 @@ where rtrim(MATRICULA)+'@'+rtrim(NumeroBeneficioINSS) in
      from #passo01
     where [status] ='INDEFERIDO')
 
+
+SELECT
+    ROW_NUMBER() OVER (
+        PARTITION BY t.Matricula, t.NumeroBeneficioINSS
+        ORDER BY t.CodigoRequerimento DESC
+    ) AS NrLinha,
+    t.CodigoRequerimento,
+    t.Matricula,
+    t.NumeroBeneficioINSS,
+    t.Status,
+    t.DataRequerimento
+    into #ultimoDeferido
+FROM #passo01 t
+ORDER BY
+    t.Matricula,
+    t.NumeroBeneficioINSS,
+    t.CodigoRequerimento DESC;
+
+delete #passo01
+where rtrim(MATRICULA)+'@'+rtrim(NumeroBeneficioINSS) in
+     (select rtrim(MATRICULA)+'@'+rtrim(NumeroBeneficioINSS) --deferimento, com data posterior à pendência
+        from #ultimoDeferido
+        where nrLinha=1 and [status]='DEFERIDO')
+
+
 ;WITH pend AS (
     SELECT
         t.*,
