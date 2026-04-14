@@ -1,3 +1,15 @@
+"""
+Projeto         : cotas reservadas
+Autor           : Rubens Lima
+Criado em       : 2026-04-10
+Última alteração: 2026-04-14
+Versão          : 1.0.0.a
+Descrição       : Geração de planilha para conferência das cotas para a CCB
+Tipo            : ETL
+Módulo          : Conferência CCB
+ID              : GBE.CCB.20260410.001
+"""
+
 import os
 import re
 import time
@@ -93,7 +105,6 @@ def main():
         print(f"Erro nas variáveis de ambiente: {e}")
         return
 
-    # Sua consulta aqui (exemplo simples; substitua por sua SQL)
     query = """
     SET NOCOUNT ON
 
@@ -103,22 +114,21 @@ def main():
         , RTRIM(pb.NR_PROCESSO)+'/'+RTRIM(PB.ANO_PROCESSO)AS PROCESSO
         , PB.CD_MATRICULA AS [MATRICULA]
         , ee1.NOME_ENTID AS [PARTICIPANTE]
-        , FORMAT(DP.DT_NASCIMENTO,'dd/MM/yyyy') AS[DT_NASCIMENTO] 
         , FORMAT(DP.DT_OBITO,'dd/MM/yyyy')AS OBITO
         ,FORMAT(DATEADD(year, 5, DP.DT_OBITO),'dd/MM/yyyy') AS 'OBITO_5ANOS'
         , FORMAT(vp.DT_INIC_BENEFICIO,'dd/MM/yyyy') AS [INICIO_BENEFICIO]
         , ee.NOME_ENTID AS [RECEBEDOR]
         , gp.DS_GRAU_PARENTESCO AS PARENTESCO
-
+        , FORMAT(DP2.DT_NASCIMENTO,'dd/MM/yyyy') AS[DT_NASCIMENTO] 
         ,    CASE 
             WHEN GB.CD_GRAU_PARENTESCO  in('03','07','08','12','05','06','13','27','14')
-                THEN FORMAT(DATEADD(year, 21, DP2.DT_NASCIMENTO),'dd/MM/yyyy')
+                THEN FORMAT(DATEADD(year, 22, DP2.DT_NASCIMENTO),'dd/MM/yyyy')
             ELSE NULL
         END AS IDADE21
 
         ,    CASE 
             WHEN GB.CD_GRAU_PARENTESCO  in('03','07','08','12','05','06','13','27','14')
-                THEN FORMAT(DATEADD(year, 26, DP2.DT_NASCIMENTO),'dd/MM/yyyy')
+                THEN FORMAT(DATEADD(year, 27, DP2.DT_NASCIMENTO),'dd/MM/yyyy')
             ELSE NULL
         END AS IDADE26
 
@@ -156,10 +166,10 @@ def main():
     
 
     WHERE   eb.CD_TIPO_ESPECIE IN ( 2, 4, 7, 6 )
-            AND EXISTS ( SELECT *
+            AND EXISTS ( SELECT 1
                         FROM   dbo.FI_GBE_FICHA_FINANC_ASSISTIDO ff1
                         WHERE  ff1.SQ_PROCESSO = re.SQ_PROCESSO )
-            AND NOT EXISTS ( SELECT *
+            AND NOT EXISTS ( SELECT 1
                             FROM   dbo.FI_GBE_FICHA_FINANC_ASSISTIDO ff2
                             WHERE  ff2.SQ_PROCESSO = re.SQ_PROCESSO
                                     AND ff2.CD_PESSOA_RECEB = re.CD_PESSOA_RECEB )
