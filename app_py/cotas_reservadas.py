@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 def limpar_console() -> None:
     os.system("cls" if os.name == "nt" else "clear")
 
+nome_arquivo = os.path.splitext(os.path.basename(__file__))[0]
 
 def carregar_cfg():
     load_dotenv()
@@ -92,73 +93,95 @@ def main():
         print(f"Erro nas variáveis de ambiente: {e}")
         return
 
-    # Personalize conforme sua necessidade 
-    solicitacao = "cotas_reservadas"
-
     # Sua consulta aqui (exemplo simples; substitua por sua SQL)
     query = """
     SET NOCOUNT ON
 
-    SELECT 
-        RTRIM(pb.NR_PROCESSO)+'/'+RTRIM(PB.ANO_PROCESSO) PROCESSO
-        , PB.CD_MATRICULA [MATRICULA]
-        , ee1.NOME_ENTID [PARTICIPANTE]
-        , FORMAT(DP.DT_OBITO,'dd/MM/yyyy') OBITO
-        , FORMAT(vp.DT_INIC_BENEFICIO,'dd/MM/yyyy') [INICIO_BENEFICIO]
-        , ee.NOME_ENTID [RECEBEDOR]
-        , gp.DS_GRAU_PARENTESCO PARENTESCO
-        , ST.DS_SIT_PROCESSO SITUACAO_PROCESSO
-        , FORMAT(DP.DT_NASCIMENTO,'dd/MM/yyyy') [DT_NASCIMENTO] 
-        , DATEDIFF(YEAR, vp.DT_INIC_BENEFICIO, GETDATE()) [QTD ANOS DIB] 
-        , TP.DS_TIPO_BLOQUEIO BLOQUEIO
+    SELECT case when PB.CD_PLANO = '0001' then 'BENEFICIO DEFINIDO'
+                        when PB.CD_PLANO = '0002' then 'POSTALPREV'
+                    end 'PLANO'
+        , RTRIM(pb.NR_PROCESSO)+'/'+RTRIM(PB.ANO_PROCESSO)AS PROCESSO
+        , PB.CD_MATRICULA AS [MATRICULA]
+        , ee1.NOME_ENTID AS [PARTICIPANTE]
+        , FORMAT(DP.DT_NASCIMENTO,'dd/MM/yyyy') AS[DT_NASCIMENTO] 
+        , FORMAT(DP.DT_OBITO,'dd/MM/yyyy')AS OBITO
+        ,FORMAT(DATEADD(year, 5, DP.DT_OBITO),'dd/MM/yyyy') AS 'OBITO_5ANOS'
+        , FORMAT(vp.DT_INIC_BENEFICIO,'dd/MM/yyyy') AS [INICIO_BENEFICIO]
+        , ee.NOME_ENTID AS [RECEBEDOR]
+        , gp.DS_GRAU_PARENTESCO AS PARENTESCO
+
+        ,    CASE 
+            WHEN GB.CD_GRAU_PARENTESCO  in('03','07','08','12','05','06','13','27','14')
+                THEN FORMAT(DATEADD(year, 21, DP2.DT_NASCIMENTO),'dd/MM/yyyy')
+            ELSE NULL
+        END AS IDADE21
+
+        ,    CASE 
+            WHEN GB.CD_GRAU_PARENTESCO  in('03','07','08','12','05','06','13','27','14')
+                THEN FORMAT(DATEADD(year, 26, DP2.DT_NASCIMENTO),'dd/MM/yyyy')
+            ELSE NULL
+        END AS IDADE26
+
+
+        , ST.DS_SIT_PROCESSO AS SITUACAO_PROCESSO   
+        , DATEDIFF(YEAR, vp.DT_INIC_BENEFICIO, GETDATE()) AS [QTD ANOS DIB] 
+        , TP.DS_TIPO_BLOQUEIO AS BLOQUEIO
         , BL.MOTIVO_BLOQUEIO
-        , FORMAT(BL.DT_LIBERACAO,'dd/MM/yyyy') LIBERACAO_BLOQUEIO
-FROM    dbo.FI_GBE_BENEFICIARIO_RECEBEDOR re
-        INNER JOIN dbo.EE_ENTIDADE ee ON ee.COD_ENTID = re.CD_PESSOA_RECEB
-        INNER JOIN dbo.FI_GBE_PROCESSO_BENEFICIO PB ON PB.SQ_PROCESSO = re.SQ_PROCESSO
-        INNER JOIN dbo.FI_GBE_ESPECIE_BENEFICIO eb ON eb.CD_ESPECIE = PB.CD_ESPECIE
-              
-        LEFT JOIN POS_GBE_BENEFICIARIO GB ON gb.SQ_BENEFICIARIO = RE.SQ_BENEFICIARIO AND PB.CD_MATRICULA = GB.CD_INSCRICAO AND  PB.CD_PLANO = gb.CD_PLANO AND PB.CD_FUNDACAO = GB.CD_FUNDACAO AND EE.NOME_ENTID = GB.NO_BENEFICIARIO ---VER A FORMA CORRETA
+        , FORMAT(BL.DT_LIBERACAO,'dd/MM/yyyy') AS LIBERACAO_BLOQUEIO
 
-        LEFT jOIN TB_GRAU_PARENTESCO GP on GP.CD_GRAU_PARENTESCO = gb.CD_GRAU_PARENTESCO
-        INNER JOIN dbo.CS_FUNCIONARIO fu ON fu.CD_FUNDACAO = PB.CD_FUNDACAO
-                                            AND fu.CD_EMPRESA = PB.CD_EMPRESA
-                                            AND fu.NUM_MATRICULA = PB.CD_MATRICULA
-        INNER JOIN dbo.EE_ENTIDADE ee1 ON ee1.COD_ENTID = fu.COD_ENTID
-        INNER JOIN dbo.CS_DADOS_PESSOAIS DP ON DP.COD_ENTID = ee1.COD_ENTID
-        INNER JOIN dbo.FI_GBE_HIST_VERSAO_PROCESSO vp ON vp.SQ_PROCESSO = PB.SQ_PROCESSO
-                                                         AND vp.SQ_VERSAO = PB.SQ_VERSAO
-        INNER JOIN FI_GBE_SIT_PROCESSO st ON ST.CD_SIT_PROCESSO = PB.CD_SIT_PROCESSO
-        LEFT JOIN CS_BLOQUEIO bl
-          ON BL. COD_ENTID   = EE1.COD_ENTID
-          AND  BL.CD_PLANO  = PB.CD_PLANO
-         -- AND BL.CD_INSCRICAO  = PB.CD_MATRICULA
-        LEFT JOIN TB_TIPO_BLOQUEIO TP ON  BL.CD_TIPO_BLOQUEIO = TP.CD_TIPO_BLOQUEIO
 
-WHERE   eb.CD_TIPO_ESPECIE IN ( 2, 4, 7, 6 )
-        AND EXISTS ( SELECT *
-                     FROM   dbo.FI_GBE_FICHA_FINANC_ASSISTIDO ff1
-                     WHERE  ff1.SQ_PROCESSO = re.SQ_PROCESSO )
-        AND NOT EXISTS ( SELECT *
-                         FROM   dbo.FI_GBE_FICHA_FINANC_ASSISTIDO ff2
-                         WHERE  ff2.SQ_PROCESSO = re.SQ_PROCESSO
-                                AND ff2.CD_PESSOA_RECEB = re.CD_PESSOA_RECEB )
+    FROM    dbo.FI_GBE_BENEFICIARIO_RECEBEDOR re
+            INNER JOIN dbo.EE_ENTIDADE ee ON ee.COD_ENTID = re.CD_PESSOA_RECEB
+            INNER JOIN dbo.FI_GBE_PROCESSO_BENEFICIO PB ON PB.SQ_PROCESSO = re.SQ_PROCESSO
+            INNER JOIN dbo.FI_GBE_ESPECIE_BENEFICIO eb ON eb.CD_ESPECIE = PB.CD_ESPECIE
+                
+            LEFT JOIN POS_GBE_BENEFICIARIO GB ON gb.SQ_BENEFICIARIO = RE.SQ_BENEFICIARIO AND PB.CD_MATRICULA = GB.CD_INSCRICAO AND  PB.CD_PLANO = gb.CD_PLANO AND PB.CD_FUNDACAO = GB.CD_FUNDACAO AND EE.NOME_ENTID = GB.NO_BENEFICIARIO ---VER A FORMA CORRETA
+            LEFT jOIN TB_GRAU_PARENTESCO GP on GP.CD_GRAU_PARENTESCO = gb.CD_GRAU_PARENTESCO
 
-GROUP BY PB.NR_PROCESSO
-, PB.ANO_PROCESSO
-, PB.CD_MATRICULA
-, ee1.NOME_ENTID
-, DP.DT_OBITO
-, vp.DT_INIC_BENEFICIO
-, ee.NOME_ENTID
-, gp.DS_GRAU_PARENTESCO
-, ST.DS_SIT_PROCESSO
-, DP.DT_NASCIMENTO
-, TP.DS_TIPO_BLOQUEIO
-, BL.MOTIVO_BLOQUEIO
-, BL.DT_LIBERACAO
+            INNER JOIN dbo.CS_FUNCIONARIO fu ON fu.CD_FUNDACAO = PB.CD_FUNDACAO
+                                                AND fu.CD_EMPRESA = PB.CD_EMPRESA
+                                                AND fu.NUM_MATRICULA = PB.CD_MATRICULA
+            INNER JOIN dbo.EE_ENTIDADE ee1 ON ee1.COD_ENTID = fu.COD_ENTID
+            INNER JOIN dbo.CS_DADOS_PESSOAIS DP ON DP.COD_ENTID = ee1.COD_ENTID
+            INNER JOIN dbo.FI_GBE_HIST_VERSAO_PROCESSO vp ON vp.SQ_PROCESSO = PB.SQ_PROCESSO
+                                                            AND vp.SQ_VERSAO = PB.SQ_VERSAO
 
-ORDER BY ee1.NOME_ENTID,PB.CD_MATRICULA,PB.ANO_PROCESSO,pb.NR_PROCESSO;
+            INNER JOIN FI_GBE_SIT_PROCESSO st ON ST.CD_SIT_PROCESSO = PB.CD_SIT_PROCESSO
+            LEFT JOIN CS_BLOQUEIO bl
+            ON BL. COD_ENTID   = EE1.COD_ENTID
+            AND  BL.CD_PLANO  = PB.CD_PLANO
+            LEFT JOIN dbo.CS_DADOS_PESSOAIS DP2 ON DP2.COD_ENTID = ee.COD_ENTID
+            -- AND BL.CD_INSCRICAO  = PB.CD_MATRICULA
+            LEFT JOIN TB_TIPO_BLOQUEIO TP ON  BL.CD_TIPO_BLOQUEIO = TP.CD_TIPO_BLOQUEIO
+    
+
+    WHERE   eb.CD_TIPO_ESPECIE IN ( 2, 4, 7, 6 )
+            AND EXISTS ( SELECT *
+                        FROM   dbo.FI_GBE_FICHA_FINANC_ASSISTIDO ff1
+                        WHERE  ff1.SQ_PROCESSO = re.SQ_PROCESSO )
+            AND NOT EXISTS ( SELECT *
+                            FROM   dbo.FI_GBE_FICHA_FINANC_ASSISTIDO ff2
+                            WHERE  ff2.SQ_PROCESSO = re.SQ_PROCESSO
+                                    AND ff2.CD_PESSOA_RECEB = re.CD_PESSOA_RECEB )
+
+    GROUP BY 
+    PB.CD_PLANO
+    , PB.NR_PROCESSO
+    , PB.ANO_PROCESSO
+    , PB.CD_MATRICULA
+    , ee1.NOME_ENTID
+    , DP.DT_OBITO
+    , vp.DT_INIC_BENEFICIO
+    , ee.NOME_ENTID
+    , gp.DS_GRAU_PARENTESCO
+    , ST.DS_SIT_PROCESSO
+    , DP.DT_NASCIMENTO
+    , TP.DS_TIPO_BLOQUEIO
+    , BL.MOTIVO_BLOQUEIO
+    , BL.DT_LIBERACAO
+    , DP2.DT_NASCIMENTO
+    ,GB.CD_GRAU_PARENTESCO;
+    
 
    """.strip()
 
@@ -188,17 +211,17 @@ ORDER BY ee1.NOME_ENTID,PB.CD_MATRICULA,PB.ANO_PROCESSO,pb.NR_PROCESSO;
     df = sanitize_columns(df)
 
     # Montar nome de arquivo com timestamp para evitar sobrescrita
-    base = sanitize_filename(solicitacao)
+    base = sanitize_filename(nome_arquivo)
     ts = time.strftime("%Y%m%d_%H%M%S")
-    nome_arquivo = os.path.join(out_dir, f"{base}_{ts}.xlsx")
+    nome_arquivo_completo = os.path.join(out_dir, f"{base}_{ts}.xlsx")
 
     print("Gerando Excel...")
     try:
-        with pd.ExcelWriter(nome_arquivo, engine="xlsxwriter") as writer:
+        with pd.ExcelWriter(nome_arquivo_completo, engine="xlsxwriter") as writer:
             sheet = "Dados"
             df.to_excel(writer, sheet_name=sheet, index=False)
             autosize_columns(writer, sheet, df)
-        print(f"Arquivo salvo com sucesso: {nome_arquivo}")
+        print(f"Arquivo salvo com sucesso: {nome_arquivo_completo}")
         if df.empty:
             print("Aviso: a consulta retornou 0 linhas (planilha criada vazia).")
         else:
