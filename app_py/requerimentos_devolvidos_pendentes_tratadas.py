@@ -279,12 +279,16 @@ def main():
         ,  req.DT_REQUERIMENTO 
 
         /*********************** EXCLUI INDEFERIDO ***************************************************/
-
-        delete #BASE_CONSULTA
-        where rtrim(MATRICULA)+'@'+rtrim(NumeroBeneficioINSS) in
-            (select rtrim(MATRICULA)+'@'+rtrim(NumeroBeneficioINSS)
-            from #BASE_CONSULTA
-        where [status] ='INDEFERIDO')
+        
+        DELETE BC
+        FROM #BASE_CONSULTA BC
+        WHERE EXISTS (
+            SELECT 1
+            FROM #BASE_CONSULTA X
+            WHERE X.MATRICULA = BC.MATRICULA
+              AND X.NumeroBeneficioINSS = BC.NumeroBeneficioINSS
+              AND X.[Status] = 'INDEFERIDO'
+        );
 
         /*********************** LISTA CRONOLOGICA ***************************************************/
 
@@ -324,7 +328,6 @@ def main():
                 AND y.NumeroBeneficioINSS = x.NumeroBeneficioINSS
             )
         );
-
 
         /*********************** ANALISADO POSTERIOR A PENDENCIA *************************************/
 
@@ -372,7 +375,6 @@ def main():
         FROM pend
         WHERE rn_pend = 1 -- pegar o ultimo pendente
         ORDER BY matricula, NumeroBeneficioINSS, DataRequerimento desc;
-
 	
     """.strip()
 
