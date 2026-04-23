@@ -1,6 +1,13 @@
 """
-retira os indeferidos
-
+Projeto         : requerimentos pendentes 
+Autor           : Rubens Lima
+Criado em       : 2026-04-10
+Última alteração: 2026-04-14
+Versão          : 1.0.0.a
+Descrição       : Geração de planilha para conferência de requerimentos pendentes  não tratados, retira os indeferidos
+Tipo            : ETL
+Módulo          : Conferência CCB
+ID              : GBE.CCB.20260423.001
 """
 
 
@@ -145,212 +152,227 @@ def main():
     # Consultas SQL
     # --------------------------
     query_principal = f"""
-    set nocount on;
 
-    IF OBJECT_ID('tempdb..#Identificador') IS NOT NULL
-        DROP TABLE #Identificador;
+        SET NOCOUNT ON ;
 
-    SELECT rtrim(fun.NUM_MATRICULA)+'@'+rtrim(req.NU_BENEFICIO_INSS) identificador
-    into #Identificador
-    FROM dbo.WEB_GBE_REQUERIMENTO AS req
-    INNER JOIN dbo.CS_FUNCIONARIO AS fun
-        ON req.CD_FUNDACAO  = fun.CD_FUNDACAO
-        AND req.CD_INSCRICAO = fun.NUM_INSCRICAO
-    INNER JOIN dbo.CS_PLANOS_VINC AS plv
-        ON fun.CD_FUNDACAO   = plv.CD_FUNDACAO
-        AND fun.NUM_INSCRICAO = plv.NUM_INSCRICAO
-    INNER JOIN web.HistoricoRequerimento AS his
-        ON req.SQ_REQUERIMENTO = his.SequencialRequerimento
-    INNER JOIN dbo.TB_PLANOS AS pln
-        ON req.CD_PLANO    = pln.CD_PLANO
-        AND req.CD_FUNDACAO = pln.CD_FUNDACAO
-    INNER JOIN dbo.WEB_GPA_SIT_INSCRICOES AS sit
-        ON req.NS_SIT_REQUERIMENTO = sit.NS_SIT_INSCRICAO
-    INNER JOIN web.TipoRequerimentoBeneficio AS tip
-        ON req.TP_PROCESSO = tip.Id
-    WHERE 1=1
-        AND req.CD_PLANO = plv.CD_PLANO
-        AND his.Data = (        SELECT MAX(sub.Data)
-        FROM web.HistoricoRequerimento AS sub
-        WHERE sub.SequencialRequerimento = req.SQ_REQUERIMENTO     )
+        IF OBJECT_ID('tempdb..#FILTRO_PERI0DO') IS NOT NULL DROP TABLE #FILTRO_PERI0DO;
+        IF OBJECT_ID('tempdb..#BASE_CONSULTA') IS NOT NULL DROP TABLE #BASE_CONSULTA;
+        IF OBJECT_ID('tempdb..#ULTIMO_DEFERIDO') IS NOT NULL DROP TABLE #ULTIMO_DEFERIDO;
+            
+        /*********************** FILTRO PERIODO  ***************************************************/
+        SELECT rtrim(fun.NUM_MATRICULA)+'@'+rtrim(req.NU_BENEFICIO_INSS) identificador
+        into #FILTRO_PERI0DO
+        FROM dbo.WEB_GBE_REQUERIMENTO AS req
+        INNER JOIN dbo.CS_FUNCIONARIO AS fun
+            ON req.CD_FUNDACAO  = fun.CD_FUNDACAO
+            AND req.CD_INSCRICAO = fun.NUM_INSCRICAO
+        INNER JOIN dbo.CS_PLANOS_VINC AS plv
+            ON fun.CD_FUNDACAO   = plv.CD_FUNDACAO
+            AND fun.NUM_INSCRICAO = plv.NUM_INSCRICAO
+        INNER JOIN web.HistoricoRequerimento AS his
+            ON req.SQ_REQUERIMENTO = his.SequencialRequerimento
+        INNER JOIN dbo.TB_PLANOS AS pln
+            ON req.CD_PLANO    = pln.CD_PLANO
+            AND req.CD_FUNDACAO = pln.CD_FUNDACAO
+        INNER JOIN dbo.WEB_GPA_SIT_INSCRICOES AS sit
+            ON req.NS_SIT_REQUERIMENTO = sit.NS_SIT_INSCRICAO
+        INNER JOIN web.TipoRequerimentoBeneficio AS tip
+            ON req.TP_PROCESSO = tip.Id
+        WHERE 1=1
+            AND req.CD_PLANO = plv.CD_PLANO
+            AND his.Data = ( SELECT MAX(sub.Data)
+                            FROM web.HistoricoRequerimento AS sub
+                            WHERE sub.SequencialRequerimento = req.SQ_REQUERIMENTO )
             AND req.DT_REQUERIMENTO >= '{data_inicio}' 
             AND req.DT_REQUERIMENTO <= '{data_fim}'
-        AND sit.NS_SIT_INSCRICAO =6
-        AND tip.Id = '1'
-        and len(req.NU_BENEFICIO_INSS)>1
-    group by fun.NUM_MATRICULA, req.NU_BENEFICIO_INSS 
-    order by fun.NUM_MATRICULA, req.NU_BENEFICIO_INSS 
-        
+                    
+            AND sit.NS_SIT_INSCRICAO =6
+            AND tip.Id = '1'
+            and len(req.NU_BENEFICIO_INSS)>1
+        group by fun.NUM_MATRICULA, req.NU_BENEFICIO_INSS 
+        order by fun.NUM_MATRICULA, req.NU_BENEFICIO_INSS 
+                
+
+        /*********************** BASE CONSULTA ***************************************************/
+
+        SELECT 
+            req.SQ_REQUERIMENTO               AS CodigoRequerimento,
+            fun.NUM_MATRICULA                 AS Matricula,
+            ent.NOME_ENTID                    AS NomeParticipante,
+            FORMAT(req.DT_REQUERIMENTO, 'dd/MM/yyyy HH:mm') AS DataRequerimento,
+            FORMAT(req.DT_DEFERIMENTO, 'dd/MM/yyyy') AS DataDeferimento,
+            req.NU_BENEFICIO_INSS             AS NumeroBeneficioINSS,
+            esp.Especie                       AS Especie,
+            tip.Descricao                     AS Tipo,
+            sit.DS_SIT_INSCRICAO              AS [Status],
+            funent.NOME_ENTID                 AS Responsavel,
+            case CAST(
+                IIF(
+                    EXISTS (
+                        SELECT 1
+                        FROM WEB_GBE_REQUERIMENTO r
+                        INNER JOIN CS_FUNCIONARIO f
+                                ON r.CD_INSCRICAO = f.NUM_INSCRICAO
+                        WHERE r.CD_MATRICULA_ATD_INCLUSAO = f.NUM_MATRICULA
+                        AND r.SQ_REQUERIMENTO = req.SQ_REQUERIMENTO
+                    ),
+                1, 0
+                ) AS bit 
+            ) WHEN 1
+            THEN 'SIM' 
+            ELSE '' end AS AutoAtendimento,
+            CASE req.IN_DECISAO_JUDICIAL 
+                WHEN '1' 
+                THEN 'SIM' 
+            ELSE '' END  AS DecisaoJudicial,
+            pln.DS_PLANO                      AS Plano,
+            format (dad.DT_OBITO, 'dd/MM/yyyy')         AS DataObito,
+            format (req.DT_INI_BENEFICIO, 'dd/MM/yyyy') AS DataInicioBeneficio,
+            his.MatriculaAtendimento          AS MatriculaResponsavel,
+            CASE req.ANEXOU_LAUDO    
+                WHEN '1' 
+                THEN 'SIM' 
+            ELSE '' END AS AnexouLaudo,
+            CASE     req.ISENTO_IR
+                WHEN '1' 
+                THEN 'SIM' 
+            ELSE '' END AS IsencaoIR     
+        into #BASE_CONSULTA
+        FROM dbo.WEB_GBE_REQUERIMENTO AS req
+        LEFT OUTER JOIN dbo.vwEspecieBeneficio AS esp
+            ON req.CD_ESPECIE = esp.Codigo
+        INNER JOIN dbo.CS_FUNCIONARIO AS fun
+            ON req.CD_FUNDACAO  = fun.CD_FUNDACAO
+            AND req.CD_INSCRICAO = fun.NUM_INSCRICAO
+        INNER JOIN dbo.EE_ENTIDADE AS ent
+            ON fun.COD_ENTID = ent.COD_ENTID
+        INNER JOIN dbo.CS_DADOS_PESSOAIS AS dad
+            ON ent.COD_ENTID = dad.COD_ENTID
+        INNER JOIN dbo.CS_PLANOS_VINC AS plv
+            ON fun.CD_FUNDACAO   = plv.CD_FUNDACAO
+            AND fun.NUM_INSCRICAO = plv.NUM_INSCRICAO
+        INNER JOIN web.HistoricoRequerimento AS his
+            ON req.SQ_REQUERIMENTO = his.SequencialRequerimento
+        LEFT OUTER JOIN dbo.CS_FUNCIONARIO AS hisfun
+            ON his.MatriculaAtendimento = hisfun.NUM_MATRICULA
+        LEFT OUTER JOIN dbo.EE_ENTIDADE AS funent
+            ON hisfun.COD_ENTID = funent.COD_ENTID
+        INNER JOIN dbo.TB_PLANOS AS pln
+            ON req.CD_PLANO    = pln.CD_PLANO
+            AND req.CD_FUNDACAO = pln.CD_FUNDACAO
+        INNER JOIN dbo.WEB_GPA_SIT_INSCRICOES AS sit
+            ON req.NS_SIT_REQUERIMENTO = sit.NS_SIT_INSCRICAO
+        INNER JOIN web.TipoRequerimentoBeneficio AS tip
+            ON req.TP_PROCESSO = tip.Id
+        WHERE
+            req.CD_PLANO = plv.CD_PLANO
+            AND his.Data = (
+                SELECT MAX(sub.Data)
+                FROM web.HistoricoRequerimento AS sub
+                WHERE sub.SequencialRequerimento = req.SQ_REQUERIMENTO
+            )
+            AND tip.Id = '1'-- CONCESSAO
+            AND rtrim(fun.NUM_MATRICULA)+'@'+rtrim(req.NU_BENEFICIO_INSS) in(select identificador from #FILTRO_PERI0DO)
+
+        ORDER BY  ent.NOME_ENTID 
+        , req.NU_BENEFICIO_INSS 
+        ,  req.DT_REQUERIMENTO 
+
+        /*********************** EXCLUI INDEFERIDO ***************************************************/
+
+        delete #BASE_CONSULTA
+        where rtrim(MATRICULA)+'@'+rtrim(NumeroBeneficioINSS) in
+            (select rtrim(MATRICULA)+'@'+rtrim(NumeroBeneficioINSS)
+            from #BASE_CONSULTA
+        where [status] ='INDEFERIDO')
+
+        /*********************** LISTA CRONOLOGICA ***************************************************/
+
+        SELECT
+        ROW_NUMBER() OVER (
+            PARTITION BY t.Matricula, t.NumeroBeneficioINSS
+            ORDER BY t.CodigoRequerimento DESC
+        ) AS NrLinha,
+        t.CodigoRequerimento,
+        t.Matricula,
+        t.NumeroBeneficioINSS,
+        t.Status,
+        t.DataRequerimento
+        into #ULTIMO_DEFERIDO
+        FROM #BASE_CONSULTA t
+        ORDER BY
+        t.Matricula,
+        t.NumeroBeneficioINSS,
+        t.CodigoRequerimento DESC;
+
+        /*********************** DEFERIMENTO POSTERIOR A PENDENCIA ***********************************/
+
+        DELETE u
+        FROM #BASE_CONSULTA u
+        WHERE EXISTS
+        (
+        SELECT 1
+        FROM #ULTIMO_DEFERIDO x
+        WHERE x.Matricula = u.Matricula
+            AND x.NumeroBeneficioINSS = u.NumeroBeneficioINSS
+            AND x.[Status] = 'DEFERIDO'
+            AND x.NrLinha =
+            (
+                SELECT MIN(y.NrLinha)
+                FROM #ULTIMO_DEFERIDO y
+                WHERE y.Matricula = x.Matricula
+                AND y.NumeroBeneficioINSS = x.NumeroBeneficioINSS
+            )
+        );
 
 
+        /*********************** ANALISADO POSTERIOR A PENDENCIA *************************************/
 
-    SELECT 
-        req.SQ_REQUERIMENTO               AS CodigoRequerimento,
-        fun.NUM_MATRICULA                 AS Matricula,
-        ent.NOME_ENTID                    AS NomeParticipante,
-        FORMAT(req.DT_REQUERIMENTO, 'dd/MM/yyyy HH:mm') AS DataRequerimento,
-        FORMAT(req.DT_DEFERIMENTO, 'dd/MM/yyyy') AS DataDeferimento,
-        req.NU_BENEFICIO_INSS             AS NumeroBeneficioINSS,
-        esp.Especie                       AS Especie,
-        tip.Descricao                     AS Tipo,
-        sit.DS_SIT_INSCRICAO              AS [Status],
-        funent.NOME_ENTID                 AS Responsavel,
-            -- Flag indicando se foi autoatendimento (r.CD_MATRICULA_ATD_INCLUSAO = f.NUM_MATRICULA)
-        case CAST(
-            IIF(
-                EXISTS (
-                    SELECT 1
-                    FROM WEB_GBE_REQUERIMENTO r
-                    INNER JOIN CS_FUNCIONARIO f
-                            ON r.CD_INSCRICAO = f.NUM_INSCRICAO
-                    WHERE r.CD_MATRICULA_ATD_INCLUSAO = f.NUM_MATRICULA
-                    AND r.SQ_REQUERIMENTO = req.SQ_REQUERIMENTO
-                ),
-            1, 0
-            ) AS bit 
-        ) WHEN 1
-        THEN 'SIM' 
-        ELSE '' end AS AutoAtendimento,
+        DELETE u
+        FROM #BASE_CONSULTA u
+        WHERE EXISTS
+        (
+        SELECT 1
+        FROM #ULTIMO_DEFERIDO x
+        WHERE x.Matricula = u.Matricula
+            AND x.NumeroBeneficioINSS = u.NumeroBeneficioINSS
+            AND x.[Status] = 'ANALISADO'
+            AND x.NrLinha =
+            (
+                SELECT MIN(y.NrLinha)
+                FROM #ULTIMO_DEFERIDO y
+                WHERE y.Matricula = x.Matricula
+                AND y.NumeroBeneficioINSS = x.NumeroBeneficioINSS
+            )
+        );
 
-        CASE req.IN_DECISAO_JUDICIAL 
-        WHEN '1' 
-        THEN 'SIM' 
-        ELSE '' END  AS DecisaoJudicial,
-        pln.DS_PLANO                      AS Plano,
-        format (dad.DT_OBITO, 'dd/MM/yyyy')         AS DataObito,
-        format (req.DT_INI_BENEFICIO, 'dd/MM/yyyy') AS DataInicioBeneficio,
-    --    format (req.DT_INCLUSAO, 'dd/MM/yyyy')     AS DataInclusao,
-    --    tip.Id                            AS CodigoTipoRequerimento,
-    --    sit.NS_SIT_INSCRICAO              AS NumeroSituacao,
-    --    pln.CD_PLANO                      AS CodigoPlano,
-    --    req.CD_ESPECIE                    AS CodigoEspecie,
-        his.MatriculaAtendimento          AS MatriculaResponsavel,
-    --    req.VL_SALARIO_CONTRIB            AS ValorSalarioContribuicao,
-    --    req.TP_BAD_SITUACAO_INSS          AS TipoSituacaoINSS,
-    --    fun.CD_EMPRESA                    AS CodigoEmpresa,
-    --    req.DADOS_RPA                     AS IndicadorDadosRPA,
-        CASE req.ANEXOU_LAUDO    
-            WHEN '1' 
-        THEN 'SIM' 
-        ELSE '' END AS AnexouLaudo,
-        CASE     req.ISENTO_IR
-            WHEN '1' 
-        THEN 'SIM' 
-        ELSE '' END AS IsencaoIR
-        
-    into #passo01
-    FROM dbo.WEB_GBE_REQUERIMENTO AS req
+        /*********************** LISTAT ULTIMO PENDENTE ************************************************/
 
-    -- Espécie do benefício
-    LEFT OUTER JOIN dbo.vwEspecieBeneficio AS esp
-        ON req.CD_ESPECIE = esp.Codigo
-
-    -- Participante (funcionário)
-    INNER JOIN dbo.CS_FUNCIONARIO AS fun
-        ON req.CD_FUNDACAO  = fun.CD_FUNDACAO
-        AND req.CD_INSCRICAO = fun.NUM_INSCRICAO
-
-    -- Entidade (dados pessoais)
-    INNER JOIN dbo.EE_ENTIDADE AS ent
-        ON fun.COD_ENTID = ent.COD_ENTID
-    INNER JOIN dbo.CS_DADOS_PESSOAIS AS dad
-        ON ent.COD_ENTID = dad.COD_ENTID
-
-    -- Plano vinculado
-    INNER JOIN dbo.CS_PLANOS_VINC AS plv
-        ON fun.CD_FUNDACAO   = plv.CD_FUNDACAO
-        AND fun.NUM_INSCRICAO = plv.NUM_INSCRICAO
-
-    -- Histórico do requerimento
-    INNER JOIN web.HistoricoRequerimento AS his
-        ON req.SQ_REQUERIMENTO = his.SequencialRequerimento
-
-    -- Funcionário e entidade responsável pelo atendimento
-    LEFT OUTER JOIN dbo.CS_FUNCIONARIO AS hisfun
-        ON his.MatriculaAtendimento = hisfun.NUM_MATRICULA
-    LEFT OUTER JOIN dbo.EE_ENTIDADE AS funent
-        ON hisfun.COD_ENTID = funent.COD_ENTID
-
-    -- Plano (informações cadastrais)
-    INNER JOIN dbo.TB_PLANOS AS pln
-        ON req.CD_PLANO    = pln.CD_PLANO
-        AND req.CD_FUNDACAO = pln.CD_FUNDACAO
-
-    -- Situação e tipo de requerimento
-    INNER JOIN dbo.WEB_GPA_SIT_INSCRICOES AS sit
-        ON req.NS_SIT_REQUERIMENTO = sit.NS_SIT_INSCRICAO
-    INNER JOIN web.TipoRequerimentoBeneficio AS tip
-        ON req.TP_PROCESSO = tip.Id
-
-    WHERE
-        req.CD_PLANO = plv.CD_PLANO
-        AND his.Data = (
-            SELECT MAX(sub.Data)
-            FROM web.HistoricoRequerimento AS sub
-            WHERE sub.SequencialRequerimento = req.SQ_REQUERIMENTO
+        ;WITH pend AS (
+            SELECT
+                t.*,
+                rn_pend = ROW_NUMBER() OVER (
+                    PARTITION BY t.matricula, t.NumeroBeneficioINSS
+                    ORDER BY t.CodigoRequerimento DESC --gerar ordem ultimo pendente
+                )
+            FROM #BASE_CONSULTA t
+            WHERE t.[status] = 'PENDENCIA'
+        ),
+        defr AS (
+            SELECT *,1 as rn_pend
+            FROM #BASE_CONSULTA
+            WHERE [status] <> 'PENDENCIA'
         )
-        AND tip.Id = '1'-- CONCESSAO
-        AND rtrim(fun.NUM_MATRICULA)+'@'+rtrim(req.NU_BENEFICIO_INSS) in(select identificador from #Identificador)
+        SELECT Matricula,NomeParticipante,DataRequerimento,DataDeferimento,NumeroBeneficioINSS,Especie,Tipo,[Status]
+        ,Responsavel,AutoAtendimento,DecisaoJudicial,Plano,DataObito,DataInicioBeneficio,MatriculaResponsavel,AnexouLaudo,IsencaoIR
+        FROM defr
+        UNION ALL
+        SELECT Matricula,NomeParticipante,DataRequerimento,DataDeferimento,NumeroBeneficioINSS,Especie,Tipo,[Status]
+        ,Responsavel,AutoAtendimento,DecisaoJudicial,Plano,DataObito,DataInicioBeneficio,MatriculaResponsavel,AnexouLaudo,IsencaoIR
+        FROM pend
+        WHERE rn_pend = 1 -- pegar o ultimo pendente
+        ORDER BY matricula, NumeroBeneficioINSS, DataRequerimento desc;
 
-    ORDER BY  ent.NOME_ENTID 
-    , req.NU_BENEFICIO_INSS 
-    ,  req.DT_REQUERIMENTO 
-
-delete #passo01
-where rtrim(MATRICULA)+'@'+rtrim(NumeroBeneficioINSS) in
-     (select rtrim(MATRICULA)+'@'+rtrim(NumeroBeneficioINSS)
-     from #passo01
-    where [status] ='INDEFERIDO')
-
-
-SELECT
-    ROW_NUMBER() OVER (
-        PARTITION BY t.Matricula, t.NumeroBeneficioINSS
-        ORDER BY t.CodigoRequerimento DESC
-    ) AS NrLinha,
-    t.CodigoRequerimento,
-    t.Matricula,
-    t.NumeroBeneficioINSS,
-    t.Status,
-    t.DataRequerimento
-    into #ultimoDeferido
-FROM #passo01 t
-ORDER BY
-    t.Matricula,
-    t.NumeroBeneficioINSS,
-    t.CodigoRequerimento DESC;
-
-delete #passo01
-where rtrim(MATRICULA)+'@'+rtrim(NumeroBeneficioINSS) in
-     (select rtrim(MATRICULA)+'@'+rtrim(NumeroBeneficioINSS) --deferimento, com data posterior à pendência
-        from #ultimoDeferido
-        where nrLinha=1 and [status]='DEFERIDO')
-
-
-;WITH pend AS (
-    SELECT
-        t.*,
-        rn_pend = ROW_NUMBER() OVER (
-            PARTITION BY t.matricula, t.NumeroBeneficioINSS
-            ORDER BY t.CodigoRequerimento DESC --gerar ordem ultimo pendente
-        )
-    FROM #passo01 t
-    WHERE t.[status] = 'PENDENCIA'
-),
-defr AS (
-    SELECT *,1 as rn_pend
-    FROM #passo01
-    WHERE [status] <> 'PENDENCIA'
-)
-SELECT Matricula,NomeParticipante,DataRequerimento,DataDeferimento,NumeroBeneficioINSS,Especie,Tipo,[Status]
-,Responsavel,AutoAtendimento,DecisaoJudicial,Plano,DataObito,DataInicioBeneficio,MatriculaResponsavel,AnexouLaudo,IsencaoIR
-FROM defr
-UNION ALL
-SELECT Matricula,NomeParticipante,DataRequerimento,DataDeferimento,NumeroBeneficioINSS,Especie,Tipo,[Status]
-,Responsavel,AutoAtendimento,DecisaoJudicial,Plano,DataObito,DataInicioBeneficio,MatriculaResponsavel,AnexouLaudo,IsencaoIR
-FROM pend
-WHERE rn_pend = 1 -- pegar o ultimo pendente
-ORDER BY matricula, NumeroBeneficioINSS, DataRequerimento desc;
 	
     """.strip()
 
