@@ -11,14 +11,6 @@ ID              : GBE.CCB.20260423.001
 """
 
 
-# import os
-# import re
-# import time
-# import urllib.parse
-# import pandas as pd
-# from sqlalchemy import create_engine, text
-# from sqlalchemy.engine import Engine
-# from dotenv import load_dotenv
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
@@ -73,61 +65,6 @@ if data_inicio is None:
     dt_inicio = dt_fim - relativedelta(months=12)
     data_inicio = dt_inicio.strftime("%m-%d-%Y")
 
-
-# ------------------------------
-# Utilidades
-# ------------------------------
- 
-
-
-
-# def carregar_cfg():
-#     load_dotenv()
-#     cfg = {
-#         "SERVER": (os.getenv("SERVER") or "").strip(),
-#         "USER": (os.getenv("USER") or "").strip(),
-#         "PASSWORD": (os.getenv("PASSWORD") or "").strip(),
-#         "DATABASE": (os.getenv("DATABASE") or "").strip(),
-#         "ODBC_DRIVER": (
-#             os.getenv("ODBC_DRIVER") or "ODBC Driver 17 for SQL Server"
-#         ).strip(),
-#         "ODBC_EXTRA": (os.getenv("ODBC_EXTRA") or "").strip(),  
-#     }
-#     faltando = [k for k in ("SERVER", "USER", "PASSWORD", "DATABASE") if not cfg[k]]
-#     if faltando:
-#         raise RuntimeError(f"Variáveis ausentes no .env: {', '.join(faltando)}")
-#     return cfg
-
-
-# def build_connection_url(cfg) -> str:
-#     """
-#     Usa DSN-less com odbc_connect e quote_plus para evitar problemas com caracteres especiais.
-#     """
-#     params = (
-#         f"DRIVER={{{cfg['ODBC_DRIVER']}}};"
-#         f"SERVER={cfg['SERVER']};"
-#         f"DATABASE={cfg['DATABASE']};"
-#         f"UID={cfg['USER']};"
-#         f"PWD={cfg['PASSWORD']}"
-#     )
-#     if cfg["ODBC_EXTRA"]:
-#         extra = cfg["ODBC_EXTRA"]
-#         if not extra.endswith(";"):
-#             extra += ";"
-#         params += ";" + extra
-#     return f"mssql+pyodbc:///?odbc_connect={urllib.parse.quote_plus(params)}"
-
-
-# def get_engine(cfg) -> Engine:
-#     url = build_connection_url(cfg)
-#     return create_engine(
-#         url,
-#         pool_pre_ping=True,
-#         pool_recycle=1800,
-#         pool_size=5,
-#         max_overflow=5,
-#         fast_executemany=False,
-#     )
 
 
 def garantir_pasta(caminho: str) -> None:
