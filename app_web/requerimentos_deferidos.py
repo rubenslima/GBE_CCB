@@ -1,3 +1,17 @@
+"""
+Projeto         : requerimentos deferidos
+Solicitante     : Marilene
+Autor           : Rubens Lima
+Criado em       : 2025-10-10
+Última alteração: 2025-10-10
+Versão          : 1.0.1.c
+Descrição       : Geração de planilha para conferência de requerimentos deferidos
+Tipo            : ETL
+Módulo          : Conferência CCB
+Tags            : requerimentos deferidos
+ID              : GBE.CCB.20251010.002.WEB
+"""
+
 import re
 import streamlit as st
 import pandas as pd
@@ -14,6 +28,7 @@ load_dotenv()
 # ------------------------------
 # Funções de Configuração e Dados
 # ------------------------------
+
 
 def get_engine():
     """Busca as credenciais do arquivo .env via os.getenv"""
@@ -39,24 +54,27 @@ def get_engine():
         )
         if extra:
             params += ";" + (extra if extra.endswith(";") else extra + ";")
-            
+
         url = f"mssql+pyodbc:///?odbc_connect={urllib.parse.quote_plus(params)}"
-        
+
         return create_engine(
-            url, 
+            url,
             pool_pre_ping=True,
-            fast_executemany=True # Otimiza inserções/leituras se o driver suportar
+            fast_executemany=True,  # Otimiza inserções/leituras se o driver suportar
         )
     except Exception as e:
         st.error(f"Erro ao configurar a engine: {e}")
         return None
 
+
 # ... (restante das funções sanitize_columns e to_excel permanecem iguais)
+
 
 def sanitize_columns(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df.columns = [re.sub(r"[\\/*?:\[\]]", "", str(col)).strip() for col in df.columns]
     return df
+
 
 def to_excel(df_dados, df_sem_num, df_estat):
     """Gera o arquivo Excel em memória para download"""
@@ -64,16 +82,17 @@ def to_excel(df_dados, df_sem_num, df_estat):
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
         # Aba Dados
         df_dados.to_excel(writer, sheet_name="Dados", index=False)
-        
+
         # Aba Sem Número Benefício
         if not df_sem_num.empty:
             df_sem_num.to_excel(writer, sheet_name="Sem_Numero_Beneficio", index=False)
-            
+
         # Aba Estatística
         if not df_estat.empty:
             df_estat.to_excel(writer, sheet_name="Estatistica", index=False)
-            
+
     return output.getvalue()
+
 
 # ------------------------------
 # Interface Streamlit
@@ -88,16 +107,16 @@ with st.sidebar:
     # Streamlit já retorna objeto datetime.date
     data_inicio_ref = st.date_input("Data Inicial", datetime.now())
     data_fim_ref = st.date_input("Data Final", datetime.now())
-    
+
     # Formatação para a Query (mm-dd-aaaa conforme original)
     data_inicio = data_inicio_ref.strftime("%m-%d-%Y")
     data_fim = data_fim_ref.strftime("%m-%d-%Y")
-    
+
     btn_processar = st.button("Executar Consulta", type="primary")
 
 if btn_processar:
     engine = get_engine()
-    
+
     if engine:
         with st.spinner("Conectando e executando queries..."):
             try:
@@ -118,7 +137,7 @@ if btn_processar:
                 AND sit.NS_SIT_INSCRICAO = 6 AND tip.Id = '1' AND len(req.NU_BENEFICIO_INSS)>1
                 group by fun.NUM_MATRICULA, req.NU_BENEFICIO_INSS;
 
-                SELECT 
+                SELECT
                     fun.NUM_MATRICULA AS Matricula, ent.NOME_ENTID AS NomeParticipante,
                     FORMAT(req.DT_REQUERIMENTO, 'dd/MM/yyyy HH:mm') AS DataRequerimento,
                     FORMAT(req.DT_DEFERIMENTO, 'dd/MM/yyyy') AS DataDeferimento,
@@ -149,11 +168,11 @@ if btn_processar:
                 with engine.connect() as conn:
                     df_principal = pd.read_sql(text(query_principal), conn)
                     # (Aqui você pode adicionar a execução da query_sem_numero_beneficio se desejar)
-                    df_sem_beneficio = pd.DataFrame() 
+                    df_sem_beneficio = pd.DataFrame()
 
                 # Processamento
                 df_principal = sanitize_columns(df_principal)
-                
+
                 # Estatísticas
                 df_estat = pd.DataFrame()
                 if not df_principal.empty and "Status" in df_principal.columns:
@@ -161,13 +180,15 @@ if btn_processar:
                     df_estat.columns = ["Status", "Total"]
 
                 # Exibição na Tela
-                st.success(f"Consulta finalizada! {len(df_principal)} registros encontrados.")
-                
+                st.success(
+                    f"Consulta finalizada! {len(df_principal)} registros encontrados."
+                )
+
                 col1, col2 = st.columns(2)
                 with col1:
                     st.subheader("Resumo por Status")
                     st.table(df_estat)
-                
+
                 st.subheader("Visualização dos Dados (Top 5)")
                 st.dataframe(df_principal.head(5), use_container_width=True)
 
@@ -177,7 +198,7 @@ if btn_processar:
                     label="📥 Baixar Relatório Excel",
                     data=excel_data,
                     file_name=f"Relatorio_Requerimentos_{datetime.now().strftime('%Y%m%d')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
 
             except Exception as e:

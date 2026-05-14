@@ -1,3 +1,17 @@
+"""
+Projeto         : requerimentos não tratados
+Solicitante     : Marilene
+Autor           : Rubens Lima
+Criado em       : 2025-10-10
+Última alteração: 2025-10-10
+Versão          : 1.0.01.b
+Descrição       : Geração de planilha para conferência de requerimentos não tratados
+Tipo            : ETL
+Módulo          : Conferência CCB
+Tags            : requerimentos não tratados
+ID              : GBE.CCB.20251010.003.CLI
+"""
+
 import os
 import re
 import time
@@ -28,6 +42,7 @@ def ler_data(mensagem: str) -> str:
 
         print("Formato inválido. Use dd/mm/aaaa ou mm-dd-aaaa.")
 
+
 data_inicio = ler_data("Informe a data inicial (dd/mm/aaaa ou mm-dd-aaaa): ")
 data_fim = ler_data("Informe a data final (dd/mm/aaaa ou mm-dd-aaaa): ")
 
@@ -49,7 +64,7 @@ def carregar_cfg():
         "ODBC_DRIVER": (
             os.getenv("ODBC_DRIVER") or "ODBC Driver 17 for SQL Server"
         ).strip(),
-        "ODBC_EXTRA": (os.getenv("ODBC_EXTRA") or "").strip(),  
+        "ODBC_EXTRA": (os.getenv("ODBC_EXTRA") or "").strip(),
     }
     faltando = [k for k in ("SERVER", "USER", "PASSWORD", "DATABASE") if not cfg[k]]
     if faltando:
@@ -135,7 +150,7 @@ def main():
         DROP TABLE #Identificador;
 
     IF OBJECT_ID('tempdb..#passo01') IS NOT NULL
-        DROP TABLE #passo01;    
+        DROP TABLE #passo01;
 
     SELECT rtrim(fun.NUM_MATRICULA)+'@'+rtrim(req.NU_BENEFICIO_INSS) identificador
     into #Identificador
@@ -160,18 +175,18 @@ def main():
         AND his.Data = (        SELECT MAX(sub.Data)
         FROM web.HistoricoRequerimento AS sub
         WHERE sub.SequencialRequerimento = req.SQ_REQUERIMENTO     )
-            AND req.DT_REQUERIMENTO >= '{data_inicio}' 
+            AND req.DT_REQUERIMENTO >= '{data_inicio}'
             AND req.DT_REQUERIMENTO <= '{data_fim}'
         AND sit.NS_SIT_INSCRICAO in(99,6) --(6)PENDENCIA (99)INDEFERIDO
         AND tip.Id = '1'
         and len(req.NU_BENEFICIO_INSS)>1
-    group by fun.NUM_MATRICULA, req.NU_BENEFICIO_INSS 
-    order by fun.NUM_MATRICULA, req.NU_BENEFICIO_INSS 
-        
+    group by fun.NUM_MATRICULA, req.NU_BENEFICIO_INSS
+    order by fun.NUM_MATRICULA, req.NU_BENEFICIO_INSS
 
 
 
-    SELECT 
+
+    SELECT
         --req.SQ_REQUERIMENTO               AS CodigoRequerimento,
         fun.NUM_MATRICULA                 AS Matricula,
         ent.NOME_ENTID                    AS NomeParticipante,
@@ -194,14 +209,14 @@ def main():
                     AND r.SQ_REQUERIMENTO = req.SQ_REQUERIMENTO
                 ),
             1, 0
-            ) AS bit 
+            ) AS bit
         ) WHEN 1
-        THEN 'SIM' 
+        THEN 'SIM'
         ELSE '' end AS AutoAtendimento,
 
-        CASE req.IN_DECISAO_JUDICIAL 
-        WHEN '1' 
-        THEN 'SIM' 
+        CASE req.IN_DECISAO_JUDICIAL
+        WHEN '1'
+        THEN 'SIM'
         ELSE '' END  AS DecisaoJudicial,
         pln.DS_PLANO                      AS Plano,
         format (dad.DT_OBITO, 'dd/MM/yyyy')         AS DataObito,
@@ -216,15 +231,15 @@ def main():
     --    req.TP_BAD_SITUACAO_INSS          AS TipoSituacaoINSS,
     --    fun.CD_EMPRESA                    AS CodigoEmpresa,
     --    req.DADOS_RPA                     AS IndicadorDadosRPA,
-        CASE req.ANEXOU_LAUDO    
-            WHEN '1' 
-        THEN 'SIM' 
+        CASE req.ANEXOU_LAUDO
+            WHEN '1'
+        THEN 'SIM'
         ELSE '' END AS AnexouLaudo,
         CASE     req.ISENTO_IR
-            WHEN '1' 
-        THEN 'SIM' 
+            WHEN '1'
+        THEN 'SIM'
         ELSE '' END AS IsencaoIR
-        
+
     into #passo01
     FROM dbo.WEB_GBE_REQUERIMENTO AS req
 
@@ -279,9 +294,9 @@ def main():
         AND tip.Id = '1'-- CONCESSAO
         AND rtrim(fun.NUM_MATRICULA)+'@'+rtrim(req.NU_BENEFICIO_INSS) in(select identificador from #Identificador)
 
-    ORDER BY  ent.NOME_ENTID 
-    , req.NU_BENEFICIO_INSS 
-    ,  req.DT_REQUERIMENTO 
+    ORDER BY  ent.NOME_ENTID
+    , req.NU_BENEFICIO_INSS
+    ,  req.DT_REQUERIMENTO
 
 delete #passo01
 where rtrim(MATRICULA)+'@'+rtrim(NumeroBeneficioINSS) in
@@ -295,18 +310,17 @@ where rtrim(MATRICULA)+'@'+rtrim(NumeroBeneficioINSS) in
      (select rtrim(MATRICULA)+'@'+rtrim(NumeroBeneficioINSS)
      from #passo01
     where [status] in ('DEFERIDO','EM ANALISE','ANALISADO')   )
- 
+
 
 select * from #passo01
     ORDER BY  NomeParticipante
-    , NumeroBeneficioINSS 
+    , NumeroBeneficioINSS
     , DataRequerimento
 
 
-	
+
     """.strip()
 
- 
     query_sem_numero_beneficio = f"""
     set nocount on;
 
@@ -336,7 +350,7 @@ select * from #passo01
         AND his.Data = (        SELECT MAX(sub.Data)
         FROM web.HistoricoRequerimento AS sub
         WHERE sub.SequencialRequerimento = req.SQ_REQUERIMENTO     )
-            AND req.DT_REQUERIMENTO >= '{data_inicio}' 
+            AND req.DT_REQUERIMENTO >= '{data_inicio}'
             AND req.DT_REQUERIMENTO <= '{data_fim}'
         AND sit.NS_SIT_INSCRICAO in(99,6)
         AND tip.Id = '1'
@@ -344,7 +358,7 @@ select * from #passo01
     group by fun.NUM_MATRICULA
     order by fun.NUM_MATRICULA
 
-    SELECT 
+    SELECT
         --req.SQ_REQUERIMENTO               AS CodigoRequerimento,
         fun.NUM_MATRICULA                 AS Matricula,
         ent.NOME_ENTID                    AS NomeParticipante,
@@ -367,14 +381,14 @@ select * from #passo01
                     AND r.SQ_REQUERIMENTO = req.SQ_REQUERIMENTO
                 ),
             1, 0
-            ) AS bit 
+            ) AS bit
         ) WHEN 1
-        THEN 'SIM' 
+        THEN 'SIM'
         ELSE '' end AS AutoAtendimento,
 
-        CASE req.IN_DECISAO_JUDICIAL 
-        WHEN '1' 
-        THEN 'SIM' 
+        CASE req.IN_DECISAO_JUDICIAL
+        WHEN '1'
+        THEN 'SIM'
         ELSE '' END  AS DecisaoJudicial,
         pln.DS_PLANO                      AS Plano,
         format (dad.DT_OBITO, 'dd/MM/yyyy')         AS DataObito,
@@ -389,15 +403,15 @@ select * from #passo01
     --    req.TP_BAD_SITUACAO_INSS          AS TipoSituacaoINSS,
     --    fun.CD_EMPRESA                    AS CodigoEmpresa,
     --    req.DADOS_RPA                     AS IndicadorDadosRPA,
-        CASE req.ANEXOU_LAUDO    
-            WHEN '1' 
-        THEN 'SIM' 
+        CASE req.ANEXOU_LAUDO
+            WHEN '1'
+        THEN 'SIM'
         ELSE '' END AS AnexouLaudo,
         CASE     req.ISENTO_IR
-            WHEN '1' 
-        THEN 'SIM' 
+            WHEN '1'
+        THEN 'SIM'
         ELSE '' END AS IsencaoIR
-        
+
 
     FROM dbo.WEB_GBE_REQUERIMENTO AS req
 
@@ -451,14 +465,13 @@ select * from #passo01
         )
         AND tip.Id = '1'-- CONCESSAO
         AND rtrim(fun.NUM_MATRICULA)  in (select matricula from #Identificador_matricula)
-        AND req.DT_REQUERIMENTO >= '{data_inicio}' 
+        AND req.DT_REQUERIMENTO >= '{data_inicio}'
         AND req.DT_REQUERIMENTO <= '{data_fim}'
 
-    ORDER BY  ent.NOME_ENTID 
-    , req.NU_BENEFICIO_INSS 
-    ,  req.DT_REQUERIMENTO 
+    ORDER BY  ent.NOME_ENTID
+    , req.NU_BENEFICIO_INSS
+    ,  req.DT_REQUERIMENTO
     """.strip()
-
 
     print("Conectando ao DATABASE...")
     try:
@@ -479,11 +492,12 @@ select * from #passo01
             df = pd.read_sql(text(query_principal), conn)
 
             try:
-                df_sem_numero_beneficio = pd.read_sql(text(query_sem_numero_beneficio), conn)
+                df_sem_numero_beneficio = pd.read_sql(
+                    text(query_sem_numero_beneficio), conn
+                )
             except Exception as e:
                 print(f"Erro ao executar a query_sem_numero_beneficio: {e}")
                 df_sem_numero_beneficio = pd.DataFrame()
- 
 
     except Exception as e:
         print(f"Erro ao executar as queries: {e}")
@@ -495,19 +509,20 @@ select * from #passo01
     # Tratar colunas
     df = sanitize_columns(df)
 
-    df_sem_numero_beneficio = sanitize_columns(df_sem_numero_beneficio) if not df_sem_numero_beneficio.empty else df_sem_numero_beneficio
+    df_sem_numero_beneficio = (
+        sanitize_columns(df_sem_numero_beneficio)
+        if not df_sem_numero_beneficio.empty
+        else df_sem_numero_beneficio
+    )
 
     df_estat = pd.DataFrame()
     if not df.empty and "Status" in df.columns:
-        df_estat = (
-            df["Status"]
-            .value_counts()
-            .reset_index()
-        )
+        df_estat = df["Status"].value_counts().reset_index()
         df_estat.columns = ["Status", "Total"]
     else:
-        print("Não foi possível gerar a aba 'Estatistica' (coluna 'Status' ausente ou sem dados).")
-
+        print(
+            "Não foi possível gerar a aba 'Estatistica' (coluna 'Status' ausente ou sem dados)."
+        )
 
     ts = time.strftime("%Y%m%d")
     nome_arquivo = os.path.join(out_dir, f"Requerimentos_Nao_Tratados_{ts}.xlsx")
@@ -519,12 +534,19 @@ select * from #passo01
             df.to_excel(writer, sheet_name=sheet, index=False)
             autosize_columns(writer, sheet, df)
 
-            if df_sem_numero_beneficio is not None and not df_sem_numero_beneficio.empty:
+            if (
+                df_sem_numero_beneficio is not None
+                and not df_sem_numero_beneficio.empty
+            ):
                 sheet_teste = "sem_numero_beneficio"
-                df_sem_numero_beneficio.to_excel(writer, sheet_name=sheet_teste, index=False)
+                df_sem_numero_beneficio.to_excel(
+                    writer, sheet_name=sheet_teste, index=False
+                )
                 autosize_columns(writer, sheet_teste, df_sem_numero_beneficio)
             else:
-                print("Não há registros sem numero de beneficio (segunda consulta não retornou linhas).")
+                print(
+                    "Não há registros sem numero de beneficio (segunda consulta não retornou linhas)."
+                )
 
             if df_estat is not None and not df_estat.empty:
                 sheet_est = "Estatistica"
@@ -533,12 +555,16 @@ select * from #passo01
 
         print(f"Arquivo salvo com sucesso: {nome_arquivo}")
         if df.empty:
-            print("Aviso: a consulta principal retornou 0 linhas (planilha criada vazia na aba 'Dados').")
+            print(
+                "Aviso: a consulta principal retornou 0 linhas (planilha criada vazia na aba 'Dados')."
+            )
         else:
             print(f"Aba 'Dados' - Linhas: {len(df)}  |  Colunas: {len(df.columns)}")
 
         if df_sem_numero_beneficio is not None and not df_sem_numero_beneficio.empty:
-            print(f"Aba 'sem_numero_beneficio' - Linhas: {len(df_sem_numero_beneficio)}  |  Colunas: {len(df_sem_numero_beneficio.columns)}")
+            print(
+                f"Aba 'sem_numero_beneficio' - Linhas: {len(df_sem_numero_beneficio)}  |  Colunas: {len(df_sem_numero_beneficio.columns)}"
+            )
 
     except Exception as e:
         print(f"Erro ao salvar o arquivo Excel: {e}")
