@@ -1,15 +1,16 @@
 """
 Projeto         : conecta DB
 Autor           : Rubens Lima
+Solicitante     : Rubens
 Criado em       : 2026-04-16
 Última alteração: 2026-04-26
 Versão          : 1.0.0.a
-Descrição       : conexão ao banco de dados
+Descrição       : conexão ao banco de dados - para projetos da CCB
 Tipo            : ETL
 Módulo          : utils
-ID              : GBE.DBA.20260410.001.APP
+Tags            :
+ID              : GBE.DBA.20260410.002.APP
 """
-
 import os
 import urllib.parse
 from sqlalchemy import create_engine

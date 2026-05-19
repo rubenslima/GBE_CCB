@@ -20,8 +20,6 @@ import os
 import sys
 import re
 import time
-
-# import urllib.parse
 import pandas as pd
 from sqlalchemy import text
 
@@ -87,7 +85,7 @@ def sanitize_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 def autosize_columns(writer, sheet_name: str, df: pd.DataFrame) -> None:
     """
-    Ajuste simples de largura por coluna usando xlsxwriter (sem reabrir o arquivo).
+    Ajustar a largura da coluna
     """
     ws = writer.sheets[sheet_name]
     for idx, col in enumerate(df.columns, start=0):
@@ -101,7 +99,7 @@ def autosize_columns(writer, sheet_name: str, df: pd.DataFrame) -> None:
 
 def main():
     try:
-        cfg = carregar_cfg()
+        carregar_cfg()
     except Exception as e:
         print(f"Erro nas variáveis de ambiente: {e}")
         return
@@ -504,9 +502,7 @@ def main():
 
     print("Executando consultas...")
     try:
-        # IMPORTANTE: manter a mesma conexão para temp tables, se houver
         with engine.connect() as conn:
-            # Consulta principal
             df = pd.read_sql(text(query_principal), conn)
 
             try:
@@ -524,7 +520,6 @@ def main():
     out_dir = "Arquivos"
     garantir_pasta(out_dir)
 
-    # Tratar colunas
     df = sanitize_columns(df)
 
     df_sem_numero_beneficio = (
