@@ -5,13 +5,12 @@ Solicitante     : Rubens
 Criado em       : 2026-04-16
 Última alteração: 2026-04-26
 Versão          : 1.0.0.a
-Descrição       : conexão ao banco de dados - para projetos da CPB
+Descrição       : conexão ao banco de dados - para projetos da CCB
 Tipo            : ETL
 Módulo          : utils
 Tags            :
-ID              : GBE.DBA.20260410.004.APP
+ID              : GBE.DBA.20260410.002.APP
 """
-
 import os
 import urllib.parse
 from sqlalchemy import create_engine
@@ -106,7 +105,7 @@ def exibir_info_ambiente_console():
     cfg = carregar_cfg()
     info = obter_info_ambiente(cfg)
 
-    print(info["cor"] + "=" * 100)
+    print(info["cor"] + "=" * 60)
     print(f"Ambiente: {info['ambiente']}")
     print(f"Origem:   {info['server']} / {info['database']}")
-    print("=" * 100 + RESET)
+    print("=" * 60 + RESET)
