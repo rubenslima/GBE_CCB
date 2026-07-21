@@ -1,71 +1,70 @@
+IF OBJECT_ID('tempdb..#COMUNICADO_DEFERIDO') IS NOT NULL
+DROP TABLE #COMUNICADO_DEFERIDO;
+
+
+SET
+NOCOUNT ON;
+
+
+SET
+DATEFORMAT DMY;
+
+
 SELECT
-    cf.Matricula,
-    ee.NOME_ENTID AS NOME_ENTIDADE,
-    ee.CPF_CGC,
-    ISNULL(BD.Plano, 'Não') PlanoBD,
-    ISNULL(BD.SitPlano, 'Não') TipoBeneficiarioBD,
-    ISNULL(CV.Plano, 'Não') PlanoPostalprev,
-    ISNULL(CV.SitPlano, 'Não') TipoBeneficiario,
-    CONVERT(CHAR(10), cf.DataObito, 103) AS DT_OBITO,
+    CF.Matricula,
+    EE.NOME_ENTID,
+    EE.CPF_CGC,
+    CONVERT(VARCHAR(12), CF.DataObito, 103) AS DATAOBITO,
+    CONVERT(VARCHAR(12), RH.DataSituacao, 103) AS DATAINCLUSAO,
     (
-        SELECT
-            CONVERT(CHAR(10), hs1.DataSituacao, 103)
-        FROM
-            Requerimento.HistoricoSituacao hs1
-        WHERE
-            hs1.RequerimentoId = hs.RequerimentoId
-            AND hs1.SituacaoId = 1
-    ) AS Data_inclusao,
-    sr.SituacaoRequerimento AS SITUACAO_REQ,
-    CONVERT(CHAR(10), hs.DataSituacao, 103) AS Data_situacao
+        CASE SituacaoRequerimento
+            WHEN 'DEFERIDO' THEN CONVERT(VARCHAR(12), RH.DataSituacao, 103)
+            ELSE CONVERT(VARCHAR(12), '', 103)
+        END
+    ) AS DATADEFERIMENTO,
+    (
+        CASE SituacaoRequerimento
+            WHEN 'DEFERIDO' THEN RH.MatriculaAtendimento
+            ELSE ''
+        END
+    ) AS ATENDENTEDEFERIMENTO,
+    (
+        CASE SituacaoRequerimento
+            WHEN 'DEFERIDO' THEN EE2.NOME_ENTID
+            ELSE ''
+        END
+    ) AS NOMEATENDENTEDEFERIMENTO,
+    RH1.MatriculaAtendimento AS ATENDENTE,
+    EE3.NOME_ENTID AS NOMEATENDENTE,
+    SITUACAOREQUERIMENTO AS SituacaoPedido,
+    CF.RequerimentoId
+INTO
+    #COMUNICADO_DEFERIDO
 FROM
-    Requerimento.ComunicadoFalecimento cf
-    INNER JOIN Requerimento.HistoricoSituacao hs ON hs.RequerimentoId = cf.RequerimentoId
-    INNER JOIN Requerimento.Situacao sr ON sr.SituacaoId = hs.SituacaoId
-    INNER JOIN dbo.CS_FUNCIONARIO fu ON fu.NUM_MATRICULA = cf.Matricula
-    INNER JOIN dbo.EE_ENTIDADE ee ON ee.COD_ENTID = fu.COD_ENTID
-    OUTER APPLY (
-        SELECT
-            'Sim' Plano,
-            SP.DS_SIT_PLANO SitPlano
-        FROM
-            dbo.CS_PLANOS_VINC PV
-            LEFT JOIN dbo.TB_SIT_PLANO SP ON SP.CD_SIT_PLANO = PV.CD_SIT_PLANO
-        WHERE
-            PV.NUM_INSCRICAO = FU.NUM_INSCRICAO
-            AND PV.CD_PLANO = '0001'
-    ) BD --BENEFICIO DEFINIDO
-    OUTER APPLY (
-        SELECT
-            'Sim' Plano,
-            SP.DS_SIT_PLANO SitPlano
-        FROM
-            dbo.CS_PLANOS_VINC PV
-            LEFT JOIN dbo.TB_SIT_PLANO SP ON SP.CD_SIT_PLANO = PV.CD_SIT_PLANO
-        WHERE
-            PV.NUM_INSCRICAO = FU.NUM_INSCRICAO
-            AND PV.CD_PLANO = '0002'
-    ) CV --POSTALPREV
+    Requerimento.ComunicadoFalecimento CF (NOLOCK)
+    LEFT JOIN dbo.CS_FUNCIONARIO FUN ON FUN.NUM_MATRICULA = CF.Matricula
+    LEFT JOIN dbo.EE_ENTIDADE EE (NOLOCK) ON EE.COD_ENTID = FUN.COD_ENTID
+    LEFT JOIN Requerimento.HistoricoSituacao RH ON RH.RequerimentoId = CF.RequerimentoId
+    LEFT JOIN Requerimento.HistoricoSituacao RH1 ON RH1.RequerimentoId = CF.RequerimentoId
+    AND RH1.SituacaoId = 1
+    LEFT JOIN dbo.CS_FUNCIONARIO FUN3 ON FUN3.NUM_MATRICULA = RH1.MatriculaAtendimento
+    LEFT JOIN dbo.EE_ENTIDADE EE3 ON EE3.COD_ENTID = FUN3.COD_ENTID
+    LEFT JOIN dbo.CS_FUNCIONARIO FUN2 ON FUN2.NUM_MATRICULA = RH.MatriculaAtendimento
+    LEFT JOIN dbo.EE_ENTIDADE EE2 ON EE2.COD_ENTID = FUN2.COD_ENTID
+    LEFT JOIN Requerimento.Situacao ON Situacao.SituacaoId = RH.SituacaoId
 WHERE
-    hs.SituacaoId = 2
-    AND cf.Matricula NOT IN (
+    RH.DataSituacao = (
         SELECT
-            pb.CD_MATRICULA
+            MAX(HIS.DataSituacao)
         FROM
-            dbo.FI_GBE_PROCESSO_BENEFICIO pb
+            Requerimento.HistoricoSituacao HIS
         WHERE
-            pb.CD_ESPECIE IN (3, 4, 10, 11)
-        UNION
-        SELECT
-            fn.NUM_MATRICULA
-        FROM
-            dbo.GB_PROCESSOS_BENEFICIO pb
-            INNER JOIN dbo.CS_FUNCIONARIO fn ON fn.CD_FUNDACAO = pb.CD_FUNDACAO
-            AND fn.NUM_INSCRICAO = pb.NUM_INSCRICAO
-        WHERE
-            pb.CD_ESPECIE IN ('21', '63')
+            HIS.RequerimentoId = RH.RequerimentoId
     )
-    AND DataObito IS NOT NULL
+    AND RH.SituacaoId = 2
 ORDER BY
-    DT_OBITO,
-    cf.Matricula;
+    RH.DataSituacao
+SELECT
+    *
+FROM
+    #COMUNICADO_DEFERIDO
