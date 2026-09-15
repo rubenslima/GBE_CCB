@@ -1,70 +1,54 @@
-IF OBJECT_ID('tempdb..#COMUNICADO_DEFERIDO') IS NOT NULL
-DROP TABLE #COMUNICADO_DEFERIDO;
-
-
-SET
-NOCOUNT ON;
-
-
 SET
 DATEFORMAT DMY;
 
 
-SELECT
-    CF.Matricula,
-    EE.NOME_ENTID,
-    EE.CPF_CGC,
-    CONVERT(VARCHAR(12), CF.DataObito, 103) AS DATAOBITO,
-    CONVERT(VARCHAR(12), RH.DataSituacao, 103) AS DATAINCLUSAO,
-    (
-        CASE SituacaoRequerimento
-            WHEN 'DEFERIDO' THEN CONVERT(VARCHAR(12), RH.DataSituacao, 103)
-            ELSE CONVERT(VARCHAR(12), '', 103)
-        END
-    ) AS DATADEFERIMENTO,
-    (
-        CASE SituacaoRequerimento
-            WHEN 'DEFERIDO' THEN RH.MatriculaAtendimento
-            ELSE ''
-        END
-    ) AS ATENDENTEDEFERIMENTO,
-    (
-        CASE SituacaoRequerimento
-            WHEN 'DEFERIDO' THEN EE2.NOME_ENTID
-            ELSE ''
-        END
-    ) AS NOMEATENDENTEDEFERIMENTO,
-    RH1.MatriculaAtendimento AS ATENDENTE,
-    EE3.NOME_ENTID AS NOMEATENDENTE,
-    SITUACAOREQUERIMENTO AS SituacaoPedido,
-    CF.RequerimentoId
-INTO
-    #COMUNICADO_DEFERIDO
-FROM
-    Requerimento.ComunicadoFalecimento CF (NOLOCK)
-    LEFT JOIN dbo.CS_FUNCIONARIO FUN ON FUN.NUM_MATRICULA = CF.Matricula
-    LEFT JOIN dbo.EE_ENTIDADE EE (NOLOCK) ON EE.COD_ENTID = FUN.COD_ENTID
-    LEFT JOIN Requerimento.HistoricoSituacao RH ON RH.RequerimentoId = CF.RequerimentoId
-    LEFT JOIN Requerimento.HistoricoSituacao RH1 ON RH1.RequerimentoId = CF.RequerimentoId
-    AND RH1.SituacaoId = 1
-    LEFT JOIN dbo.CS_FUNCIONARIO FUN3 ON FUN3.NUM_MATRICULA = RH1.MatriculaAtendimento
-    LEFT JOIN dbo.EE_ENTIDADE EE3 ON EE3.COD_ENTID = FUN3.COD_ENTID
-    LEFT JOIN dbo.CS_FUNCIONARIO FUN2 ON FUN2.NUM_MATRICULA = RH.MatriculaAtendimento
-    LEFT JOIN dbo.EE_ENTIDADE EE2 ON EE2.COD_ENTID = FUN2.COD_ENTID
-    LEFT JOIN Requerimento.Situacao ON Situacao.SituacaoId = RH.SituacaoId
-WHERE
-    RH.DataSituacao = (
+WITH
+    COMUNICADO_DEFERIDO AS (
         SELECT
-            MAX(HIS.DataSituacao)
+            CF.Matricula,
+            EE.NOME_ENTID AS Participante,
+            EE.CPF_CGC AS CPF,
+            CAST(CF.DataObito AS DATE) AS Obito,
+            MAX(
+                CASE
+                    WHEN RH.SituacaoId = 1 THEN CAST(RH.DataSituacao AS DATE)
+                END
+            ) AS Incluido,
+            MAX(
+                CASE
+                    WHEN RH.SituacaoId = 2 THEN CAST(RH.DataSituacao AS DATE)
+                END
+            ) AS Deferido
         FROM
-            Requerimento.HistoricoSituacao HIS
+            Requerimento.ComunicadoFalecimento CF
+        WITH
+            (NOLOCK)
+            LEFT JOIN dbo.CS_FUNCIONARIO FUN ON FUN.NUM_MATRICULA = CF.Matricula
+            LEFT JOIN dbo.EE_ENTIDADE EE
+        WITH
+            (NOLOCK) ON EE.COD_ENTID = FUN.COD_ENTID
+            LEFT JOIN Requerimento.HistoricoSituacao RH ON RH.RequerimentoId = CF.RequerimentoId
         WHERE
-            HIS.RequerimentoId = RH.RequerimentoId
+            1 = 1
+            AND RH.SituacaoId IN (1, 2)
+        GROUP BY
+            CF.Matricula,
+            EE.NOME_ENTID,
+            EE.CPF_CGC,
+            CF.DataObito
     )
-    AND RH.SituacaoId = 2
-ORDER BY
-    RH.DataSituacao
 SELECT
-    *
+    Matricula,
+    Participante,
+    CPF,
+    FORMAT(Obito, 'dd/MM/yyyy') AS DATAOBITO,
+    FORMAT(Incluido, 'dd/MM/yyyy') AS DATAINCLUSAO,
+    FORMAT(Deferido, 'dd/MM/yyyy') AS DATADEFERIMENTO,
+    DATEDIFF(dd, Obito, Incluido) AS dias_entre_obito_comunicado,
+    DATEDIFF(dd, Incluido, Deferido) AS dias_entre_comunicado_deferimento
 FROM
-    #COMUNICADO_DEFERIDO
+    COMUNICADO_DEFERIDO
+WHERE
+    Deferido IS NOT NULL
+ORDER BY
+    Participante;
